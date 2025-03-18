@@ -18,5 +18,8 @@
     <ClCompile Include="Source.cpp">
       <Filter>資源檔</Filter>
     </ClCompile>
+    <ClCompile Include="game.cpp">
+      <Filter>資源檔</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
