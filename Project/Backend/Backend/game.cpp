@@ -255,7 +255,7 @@ void checkGameOver(vector<vector<int>>& board, int whiteScore, int blackScore) {
 	}
 	// game over
 }
-
+/*
 int main() {
 	vector<vector<int>> board(BOARD_SIZE, vector<int>(BOARD_SIZE, 0)); // 棋盤狀態 0:空格 1:黑 2:白
 	vector<pair<int, int>> validSquare; // 有效格子
@@ -311,6 +311,6 @@ int main() {
 		}
 
 	}
-
 	return 0;
 }
+*/
