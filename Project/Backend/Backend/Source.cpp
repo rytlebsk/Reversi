@@ -1,6 +1,6 @@
 ﻿#include <uwebsockets/App.h>
 #include <nlohmann/json.hpp>
-#include "game.h"
+#include "Game.h"
 using namespace std;
 using namespace uWS;
 using namespace nlohmann;

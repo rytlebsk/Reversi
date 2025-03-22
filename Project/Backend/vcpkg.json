@@ -1,8 +1,10 @@
 {
-    "name": "my-project",
-    "version": "1.0.0",
-    "dependencies": [
-        "uwebsockets",
-        "nlohmann-json"
-    ]
+  "name": "my-project",
+  "version": "1.0.0",
+  "dependencies": [
+    "nlohmann-json",
+    "uwebsockets",
+    "sqlite3",
+    "sqlitecpp"
+  ]
 }
