@@ -1,25 +1,65 @@
 ﻿#include <vector>
 #include <iostream>
+#include "game.h"
 
 using namespace std;
 
 const int BOARD_SIZE = 8;  // 棋盤是 8x8
-
 struct piece {
 	int row;
 	int col;
 	int player;
 };
+void initialBoard(vector<vector<int>>& board);
+bool checkPiece(vector<vector<int>>& board, pair<int, int> dir, piece opponent_piece, int player);
+void findValidSquare(vector<vector<int>>& board, vector<pair<int, int>>& validSquare, int player);
+void findCanEatSquare(vector<vector<int>>& board, vector<pair<int, int>>& validSquare, int& player);
+bool placePiece(vector<vector<int>>& board, vector<pair<int, int>>& validSquare, pair<int, int> position, int& player);
+void calculateScore(vector<vector<int>>& board, int& whiteScore, int& blackScore);
+void checkGameOver(vector<vector<int>>& board, int whiteScore, int blackScore);
 
-class Game {
-	int id; //key -> id
-	bool priority;
-	double hostTimer;
-	double guestTimer;
-	vector<vector<int>> board;
-	vector<int> pathX; //positionX -> pathX
-	vector<int> pathY; //positionY -> pathY
-};
+void Game::initialGame() {
+	initialBoard(board);
+	findValidSquare(board, validSquare, player); // 找出初始有效格子
+	findCanEatSquare(board, validSquare, player); // 找出初始可吃格子
+	// 測試顯示
+	for (int i = 0; i < board.size(); i++) {
+		for (int j = 0; j < board.size(); j++) {
+			cout << board[i][j] << " ";
+		}
+		cout << endl;
+	}
+}
+
+void Game::place(int x, int y) {
+	if (nonValidCount >= 2) {
+		// 遊戲結束
+		checkGameOver(board, whiteScore, blackScore);
+	}
+
+	// 遊戲結束判斷
+	checkGameOver(board, whiteScore, blackScore);
+
+	if (placePiece(board, validSquare, { x,y }, player)) {
+		calculateScore(board, whiteScore, blackScore);
+		findValidSquare(board, validSquare, player);
+		findCanEatSquare(board, validSquare, player);
+		if (validSquare.empty()) {
+			nonValidCount++;
+			player = 3 - player;
+			findValidSquare(board, validSquare, player);
+			findCanEatSquare(board, validSquare, player);
+		}
+		nonValidCount = 0;
+	}
+	// 測試顯示
+	for (int i = 0; i < board.size(); i++) {
+		for (int j = 0; j < board.size(); j++) {
+			cout << board[i][j] << " ";
+		}
+		cout << endl;
+	}
+}
 
 
 void initialBoard(vector<vector<int>>& board) {
@@ -255,6 +295,8 @@ void checkGameOver(vector<vector<int>>& board, int whiteScore, int blackScore) {
 	}
 	// game over
 }
+
+
 /*
 int main() {
 	vector<vector<int>> board(BOARD_SIZE, vector<int>(BOARD_SIZE, 0)); // 棋盤狀態 0:空格 1:黑 2:白

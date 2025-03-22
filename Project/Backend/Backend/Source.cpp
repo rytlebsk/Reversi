@@ -1,56 +1,61 @@
 ﻿#include <uwebsockets/App.h>
 #include <nlohmann/json.hpp>
+#include "game.h"
 using namespace std;
 using namespace uWS;
 using namespace nlohmann;
 
+Game game;
+
 // handle function
-void place() {
+void place(json data) {
+	int x = data["x"];
+	int y = data["y"];
+	game.place(x, y);
+}
+
+void undo(json data) {
 
 }
 
-void undo() {
+void sync(json data) {
 
 }
 
-void sync() {
+void save(json data) {
 
 }
 
-void save() {
+void login(json data) {
 
 }
 
-void login() {
+void join(json data) {
+	game.initialGame();
+}
+
+void leave(json data) {
 
 }
 
-void join() {
+void replay(json data) {
 
 }
 
-void leave() {
+void update(json data) {
 
 }
 
-void replay() {
+void replayed(json data) {
 
 }
 
-void update() {
-
-}
-
-void replayed() {
-
-}
-
-void joined() {
+void joined(json data) {
 
 }
 
 
-map<string, void(*)()> EVENTMAP{
+map<string, void(*)(json data)> EVENTMAP{
 	{"place",place},
 	{"replay",replay},
 	{"undo", undo},
@@ -82,7 +87,7 @@ int main() {
 			json response = json::parse(message);
 			string socketEvent = response["event"];
 			if (EVENTMAP.find(socketEvent) != EVENTMAP.end()) {
-				EVENTMAP[socketEvent]();
+				EVENTMAP[socketEvent](response);
 			}
 			ws->send(message, opCode, false);  // Echo 回傳訊息
 		},
