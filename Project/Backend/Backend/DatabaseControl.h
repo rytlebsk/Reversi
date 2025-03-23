@@ -6,7 +6,8 @@
 #include <vector>
 #include <string>
 #include <SQLiteCpp/SQLiteCpp.h>
-#include"Game.h"
+#include "Game.h"
+#include "User.h"
 using namespace std;
 using namespace SQLite;
 
@@ -16,9 +17,8 @@ public:
 	ReversiDB() {};
 	~ReversiDB() {};
 
-	void initDB();
-	string findName(int playerId);
-	vector<Game> findGame(int playerId);
+	static void initDB();
+	static User getUser(int playerId);
+	static void regis(string name);
 };
-
 #endif

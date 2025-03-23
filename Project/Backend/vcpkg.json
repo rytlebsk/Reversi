@@ -5,6 +5,7 @@
     "nlohmann-json",
     "uwebsockets",
     "sqlite3",
-    "sqlitecpp"
+    "sqlitecpp",
+    "zlib"
   ]
 }

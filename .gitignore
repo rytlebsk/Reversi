@@ -403,3 +403,5 @@ FodyWeavers.xsd
 
 # Ignore vcpkg installed packages
 Project/Backend/vcpkg_installed*/
+
+*.db

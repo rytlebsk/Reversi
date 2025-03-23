@@ -1,11 +1,16 @@
 ﻿#include <uwebsockets/App.h>
 #include <nlohmann/json.hpp>
+#include <string>
 #include "Game.h"
+#include "User.h"
+#include "DatabaseControl.h"
 using namespace std;
 using namespace uWS;
 using namespace nlohmann;
 
 Game game;
+
+vector<User> online;
 
 // handle function
 void place(json data) {
@@ -27,7 +32,24 @@ void save(json data) {
 }
 
 void login(json data) {
+	try {
+		cout << "login" << endl;
+		string strId = data["id"];
 
+		int a = stoi(strId);
+		cout << "trans complete" << endl;
+
+		User user = ReversiDB::getUser(a);
+
+		online.push_back(user);
+	}
+	catch (runtime_error e) {
+		cerr << e.what() << endl;
+	}
+}
+
+void regis(json data) {
+	ReversiDB::regis(data["name"]);
 }
 
 void join(json data) {
@@ -62,12 +84,12 @@ map<string, void(*)(json data)> EVENTMAP{
 	{"sync",sync},
 	{"save",save},
 	{"login",login},
+	{"register",regis},
 	{"join",join},
 	{"leave",leave},
 	{"update",update},
 	{"replayed",replayed},
 	{"joined",joined},
-
 };
 
 
@@ -81,6 +103,7 @@ int main() {
 		/* WebSocket 事件處理 */
 		.open = [](auto* ws) {
 			cout << "WebSocket 連線成功!" << endl;
+			ReversiDB::initDB();
 		},
 		.message = [](auto* ws, string_view message, OpCode opCode) {
 			cout << message << opCode << endl;

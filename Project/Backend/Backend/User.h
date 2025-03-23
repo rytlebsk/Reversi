@@ -11,11 +11,11 @@ class User
 {
 public:
 	User();
-	User(int playerId);
 	~User();
 
 	int id = 0;
 	string name = "";
+	vector<int> gameId;
 	vector<Game> game;
 };
 
