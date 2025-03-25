@@ -19,6 +19,6 @@ public:
 
 	static void initDB();
 	static User getUser(int playerId);
-	static void regis(string name);
+	static int regis(string name);
 };
 #endif

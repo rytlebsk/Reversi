@@ -17,6 +17,7 @@ public:
 	string name = "";
 	vector<int> gameId;
 	vector<Game> game;
+	int playingId;
 };
 
 #endif

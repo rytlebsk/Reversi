@@ -36,7 +36,7 @@ void ReversiDB::initDB() {
 	cout << "¾Þ§@§¹¦¨¡C" << endl;
 }
 
-void ReversiDB::regis(string name) {
+int ReversiDB::regis(string name) {
 	try {
 		Statement registerUser(db, "INSERT INTO users (name, gameId) VALUES (?, ?) ");
 
@@ -51,6 +51,8 @@ void ReversiDB::regis(string name) {
 		cout << "register " << name << " success" << endl;
 
 		dbSize++;
+
+		return dbSize;
 	}
 	catch (const Exception& e) {
 		cerr << "register " << name << " fail cause from " << e.what() << endl;
@@ -90,15 +92,15 @@ User ReversiDB::getUser(int playerId) {
 
 		while (searchGame.executeStep()) {
 			Game game;
-			game.id = searchGame.getColumn("id").getInt();
-			game.player = searchGame.getColumn("player").getInt();
-			game.whiteScore = searchGame.getColumn("whiteScore").getInt();
-			game.blackScore = searchGame.getColumn("blackScore").getInt();
-			game.nonValidCount = searchGame.getColumn("nonValidCount").getInt();
-			game.board = json::parse(searchUser.getColumn("board").getString())["board"].get<vector<vector<int>>>();
-			game.validSquare = json::parse(searchUser.getColumn("validSquare").getString())["validSquare"].get<vector<pair<int, int>>>();
-			game.pathX = json::parse(searchUser.getColumn("pathX").getString())["pathX"].get<vector<int>>();
-			game.pathY = json::parse(searchUser.getColumn("pathY").getString())["pathY"].get<vector<int>>();
+			game.id = searchGame.getColumn(0).getInt();
+			game.player = searchGame.getColumn(1).getInt();
+			game.whiteScore = searchGame.getColumn(2).getInt();
+			game.blackScore = searchGame.getColumn(3).getInt();
+			game.nonValidCount = searchGame.getColumn(4).getInt();
+			game.board = json::parse(searchUser.getColumn(5).getString())["board"].get<vector<vector<int>>>();
+			game.validSquare = json::parse(searchUser.getColumn(6).getString())["validSquare"].get<vector<pair<int, int>>>();
+			game.pathX = json::parse(searchUser.getColumn(7).getString())["pathX"].get<vector<int>>();
+			game.pathY = json::parse(searchUser.getColumn(8).getString())["pathY"].get<vector<int>>();
 
 			player.game.push_back(game);
 		}

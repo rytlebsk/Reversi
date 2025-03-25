@@ -1,83 +1,91 @@
 ﻿#include <uwebsockets/App.h>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <sstream>
 #include "Game.h"
 #include "User.h"
 #include "DatabaseControl.h"
 using namespace std;
 using namespace uWS;
 using namespace nlohmann;
+using webSocket = uWS::WebSocket<0, 1, class std::basic_string<char, struct std::char_traits<char>, class std::allocator<char>>>;//alias
 
 Game game;
 
-vector<User> online;
+vector<User> onlineUser(1, User());
+vector<Game> onlineGame(1, Game());
 
 // handle function
-void place(json data) {
+void place(webSocket* ws, OpCode opCode, json data) {
 	int x = data["x"];
 	int y = data["y"];
 	game.place(x, y);
 }
 
-void undo(json data) {
+void undo(webSocket* ws, OpCode opCode, json data) {
 
 }
 
-void sync(json data) {
+void sync(webSocket* ws, OpCode opCode, json data) {
 
 }
 
-void save(json data) {
+void save(webSocket* ws, OpCode opCode, json data) {
 
 }
 
-void login(json data) {
-	try {
-		cout << "login" << endl;
-		string strId = data["id"];
+void login(webSocket* ws, OpCode opCode, json data) {
 
-		int a = stoi(strId);
-		cout << "trans complete" << endl;
+	cout << "login" << endl;
 
-		User user = ReversiDB::getUser(a);
+	string strId = data["id"];
+	User user = ReversiDB::getUser(stoi(strId));
 
-		online.push_back(user);
-	}
-	catch (runtime_error e) {
-		cerr << e.what() << endl;
-	}
+	onlineUser.push_back(user);
+
+	stringstream ss;
+	ss << onlineUser.size();
+	string a = ss.str();
+
+	ws->send(a);
 }
 
-void regis(json data) {
-	ReversiDB::regis(data["name"]);
+void regis(webSocket* ws, OpCode opCode, json data) {
+	int id = ReversiDB::regis(data["name"]);
+
+	stringstream ss;
+	ss << id;
+	string a = ss.str();
+
+	ws->send(a, opCode, false);
 }
 
-void join(json data) {
+void join(webSocket* ws, OpCode opCode, json data) {
 	game.initialGame();
 }
 
-void leave(json data) {
+void leave(webSocket* ws, OpCode opCode, json data) {
 
 }
 
-void replay(json data) {
+void replay(webSocket* ws, OpCode opCode, json data) {
 
 }
 
-void update(json data) {
+void update(webSocket* ws, OpCode opCode, json data) {
 
 }
 
-void replayed(json data) {
+void replayed(webSocket* ws, OpCode opCode, json data) {
 
 }
 
-void joined(json data) {
+void joined(webSocket* ws, OpCode opCode, json data) {
 
 }
 
 
-map<string, void(*)(json data)> EVENTMAP{
+map<string, void(*)(webSocket* ws, OpCode opCode, json data)> EVENTMAP{
 	{"place",place},
 	{"replay",replay},
 	{"undo", undo},
@@ -94,23 +102,23 @@ map<string, void(*)(json data)> EVENTMAP{
 
 
 int main() {
-	struct MyStruct
-	{
-
-	};
-
 	App().ws<string>("/*", {
 		/* WebSocket 事件處理 */
 		.open = [](auto* ws) {
 			cout << "WebSocket 連線成功!" << endl;
 			ReversiDB::initDB();
 		},
-		.message = [](auto* ws, string_view message, OpCode opCode) {
+		.message = [](webSocket* ws, string_view message, OpCode opCode) {
 			cout << message << opCode << endl;
 			json response = json::parse(message);
 			string socketEvent = response["event"];
 			if (EVENTMAP.find(socketEvent) != EVENTMAP.end()) {
-				EVENTMAP[socketEvent](response);
+				try {
+					EVENTMAP[socketEvent](ws, opCode, response);
+				}
+				catch (const Exception& e) {
+					cerr << e.what() << endl;
+				}
 			}
 			ws->send(message, opCode, false);  // Echo 回傳訊息
 		},
