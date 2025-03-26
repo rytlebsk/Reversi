@@ -1,0 +1,64 @@
+:root {
+  --background: #ededed;
+  --background2: #e2e2e2;
+  --foreground: #171717;
+  --chess-black-color: #353535;
+  --chess-black-color2: #1b1b1b;
+  --chess-white-color: #f5f5f5;
+  --chess-white-color2: #cacaca;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #171717;
+    --background2: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--foreground);
+  font-size: 0.833vw;
+  overflow: hidden;
+}
+
+html {
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--background2);
+}
+
+body {
+  aspect-ratio: 4 / 3;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  background-color: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  html {
+    color-scheme: dark;
+  }
+}
