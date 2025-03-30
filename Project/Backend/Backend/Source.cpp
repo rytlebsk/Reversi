@@ -57,7 +57,7 @@ void undo(webSocket* ws, OpCode opCode, json data) {
 	game.pathY.pop_back();
 	game.initialGame();
 
-	for(int i = 0; i < game.pathX.size(); i++) {
+	for (int i = 0; i < game.pathX.size(); i++) {
 		game.place(game.pathX[i], game.pathY[i]);
 	}
 
@@ -72,11 +72,27 @@ void undo(webSocket* ws, OpCode opCode, json data) {
 }
 
 void sync(webSocket* ws, OpCode opCode, json data) {
-
+	try {
+		json gameJson = game;
+		ws->send(gameJson.dump(), opCode);
+		std::cout << "Sync game state: " << gameJson.dump(4) << std::endl;
+	}
+	catch (const nlohmann::json::exception& e) {
+		std::cerr << "同步錯誤: " << e.what() << std::endl;
+	}
 }
 
 void save(webSocket* ws, OpCode opCode, json data) {
-
+	game.id = onlineGame.size() + 1; // 手動生成遊戲 ID
+	onlineGame.push_back(game);
+	try {
+		json response = { {"status", "success"}, {"gameId", game.id} };
+		ws->send(response.dump(), opCode);
+		std::cout << "Game saved in memory with ID: " << game.id << std::endl;
+	}
+	catch (const nlohmann::json::exception& e) {
+		std::cerr << "保存錯誤: " << e.what() << std::endl;
+	}
 }
 
 void login(webSocket* ws, OpCode opCode, json data) {
@@ -107,26 +123,81 @@ void regis(webSocket* ws, OpCode opCode, json data) {
 
 void join(webSocket* ws, OpCode opCode, json data) {
 	game.initialGame();
+	try {
+		json gameJson = game;
+		ws->send(gameJson.dump(), opCode);
+		std::cout << "User joined game" << std::endl;
+	}
+	catch (const nlohmann::json::exception& e) {
+		std::cerr << "加入遊戲錯誤: " << e.what() << std::endl;
+	}
 }
 
 void leave(webSocket* ws, OpCode opCode, json data) {
-
+	// 假設什麼都不做，只發送確認訊息
+	try {
+		json response = { {"status", "success"}, {"message", "Left game"} };
+		ws->send(response.dump(), opCode);
+		std::cout << "User left game" << std::endl;
+	}
+	catch (const nlohmann::json::exception& e) {
+		std::cerr << "離開遊戲錯誤: " << e.what() << std::endl;
+	}
 }
 
 void replay(webSocket* ws, OpCode opCode, json data) {
-	
+	int gameId = data["gameId"];
+	for (const auto& g : onlineGame) {
+		if (g.id == gameId) {
+			game = g; // 從 onlineGame 中重播
+			try {
+				json gameJson = game;
+				ws->send(gameJson.dump(), opCode);
+				std::cout << "Replaying game " << gameId << std::endl;
+			}
+			catch (const nlohmann::json::exception& e) {
+				std::cerr << "重播錯誤: " << e.what() << std::endl;
+			}
+			return;
+		}
+	}
+	json response = { {"status", "error"}, {"message", "Game not found"} };
+	ws->send(response.dump(), opCode);
 }
 
 void update(webSocket* ws, OpCode opCode, json data) {
-
+	game.player = (game.player == 1) ? 2 : 1; // 切換玩家
+	try {
+		json gameJson = game;
+		ws->send(gameJson.dump(), opCode);
+		std::cout << "Game updated, current player: " << game.player << std::endl;
+	}
+	catch (const nlohmann::json::exception& e) {
+		std::cerr << "更新錯誤: " << e.what() << std::endl;
+	}
 }
 
 void replayed(webSocket* ws, OpCode opCode, json data) {
-
+	int gameId = data["gameId"];
+	try {
+		json response = { {"status", "replayed"}, {"gameId", gameId} };
+		ws->send(response.dump(), opCode);
+		std::cout << "Replay confirmed for game " << gameId << std::endl;
+	}
+	catch (const nlohmann::json::exception& e) {
+		std::cerr << "重播確認錯誤: " << e.what() << std::endl;
+	}
 }
 
 void joined(webSocket* ws, OpCode opCode, json data) {
-
+	try {
+		json response = { {"status", "joined"}, {"gameId", game.id} };
+		ws->send(response.dump(), opCode);
+		std::cout << "Join confirmed" << std::endl;
+	}
+	catch (const nlohmann::json::exception& e) {
+		std::cerr << "加入確認錯誤: " << e.what() << std::endl;
+	}
 }
 
 
