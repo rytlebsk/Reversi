@@ -18,7 +18,8 @@ public:
 	~ReversiDB() {};
 
 	static void initDB();
-	static User getUser(int playerId);
-	static int regis(string name);
+	static User getUser(int);
+	static int regis();
+	static void save(User);
 };
 #endif

@@ -2,7 +2,7 @@
 #include <nlohmann/json.hpp>
 using namespace nlohmann;
 
-Database db("test.db", OPEN_READWRITE | OPEN_CREATE);
+Database db("reversi.db", OPEN_READWRITE | OPEN_CREATE);
 int dbSize;
 
 void ReversiDB::initDB() {
@@ -10,7 +10,6 @@ void ReversiDB::initDB() {
 		// 創建資料表
 		db.exec("CREATE TABLE IF NOT EXISTS users ("
 			"id INTEGER PRIMARY KEY AUTOINCREMENT, "
-			"name TEXT NOT NULL, "
 			"gameId TEXT)");
 
 		db.exec("CREATE TABLE IF NOT EXISTS games ("
@@ -36,26 +35,23 @@ void ReversiDB::initDB() {
 	cout << "操作完成。" << endl;
 }
 
-int ReversiDB::regis(string name) {
+int ReversiDB::regis() {
 	try {
-		Statement registerUser(db, "INSERT INTO users (name, gameId) VALUES (?, ?) ");
+		Statement registerUser(db, "INSERT INTO users (gameId) VALUES (?) ");
 
 		json emptyGameId = { {"gameId", json::array()} };
 		string str = emptyGameId.dump();
 
-		registerUser.bind(1, name);
-		registerUser.bind(2, str);
+		registerUser.bind(1, str);
 
 		registerUser.exec();
-
-		cout << "register " << name << " success" << endl;
 
 		dbSize++;
 
 		return dbSize;
 	}
 	catch (const Exception& e) {
-		cerr << "register " << name << " fail cause from " << e.what() << endl;
+		cerr << "register fail cause from " << e.what() << endl;
 	}
 }
 
@@ -68,8 +64,7 @@ User ReversiDB::getUser(int playerId) {
 
 		if (searchUser.executeStep()) {
 			player.id = searchUser.getColumn(0).getInt();
-			player.name = searchUser.getColumn(1).getString();
-			player.gameId = json::parse(searchUser.getColumn(2).getString())["gameId"].get<vector<int>>();
+			player.gameId = json::parse(searchUser.getColumn(1).getString())["gameId"].get<vector<int>>();
 		}
 		else {
 			throw runtime_error("User not found");
@@ -79,10 +74,12 @@ User ReversiDB::getUser(int playerId) {
 
 		string query = "SELECT id, player, whiteScore, blackScore, nonValidCount, board, validSquare, pathX, pathY "
 			"FROM games WHERE id IN (";
+
 		for (size_t i = 0; i < player.gameId.size(); ++i) {
 			query += "?";
 			if (i < player.gameId.size() - 1) query += ",";
 		}
+
 		query += ")";
 
 		Statement searchGame(db, query);
@@ -115,4 +112,6 @@ User ReversiDB::getUser(int playerId) {
 	}
 }
 
+void ReversiDB::save(User user) {
 
+}

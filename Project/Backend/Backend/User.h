@@ -14,10 +14,8 @@ public:
 	~User();
 
 	int id = 0;
-	string name = "";
 	vector<int> gameId;
 	vector<Game> game;
-	int playingId;
 };
 
 #endif

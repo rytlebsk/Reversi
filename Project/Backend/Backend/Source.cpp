@@ -8,12 +8,23 @@
 using namespace std;
 using namespace uWS;
 using namespace nlohmann;
-using webSocket = uWS::WebSocket<0, 1, class std::basic_string<char, struct std::char_traits<char>, class std::allocator<char>>>;//alias
+using webSocket = uWS::WebSocket<0, 1, class basic_string<char, struct char_traits<char>, class allocator<char>>>;//alias
 
 Game game;
 
-vector<User> onlineUser(1, User());
+json onlineUser;
 vector<Game> onlineGame(1, Game());
+
+struct Data {
+	Data(webSocket* _ws, OpCode _opCode, json _data) {
+		ws = _ws;
+		opCode = _opCode;
+		data = _data;
+	}
+	webSocket* ws;
+	OpCode opCode;
+	json data;
+};
 
 // 定義 std::pair<int, int> 的 JSON 轉換
 void to_json(json& j, const pair<int, int>& p) {
@@ -36,23 +47,23 @@ void to_json(json& j, const Game& g) {
 }
 
 // handle function
-void place(webSocket* ws, OpCode opCode, json data) {
-	int x = data["x"];
-	int y = data["y"];
+void place(Data datas) {
+	int x = datas.data["x"];
+	int y = datas.data["y"];
 	game.place(x, y);
 	game.pathX.push_back(x);
 	game.pathY.push_back(y);
 	try {
 		json gameJson = game;
-		std::cout << "Game JSON: " << gameJson.dump(4) << std::endl;
-		ws->send(gameJson.dump(), opCode);
+		cout << "Game JSON: " << gameJson.dump(4) << endl;
+		datas.ws->send(gameJson.dump(), datas.opCode);
 	}
-	catch (const nlohmann::json::exception& e) {
-		std::cerr << "JSON 轉換錯誤: " << e.what() << std::endl;
+	catch (const json::exception& e) {
+		cerr << "JSON 轉換錯誤: " << e.what() << endl;
 	}
 }
 
-void undo(webSocket* ws, OpCode opCode, json data) {
+void undo(Data datas) {
 	game.pathX.pop_back();
 	game.pathY.pop_back();
 	game.initialGame();
@@ -63,145 +74,144 @@ void undo(webSocket* ws, OpCode opCode, json data) {
 
 	try {
 		json gameJson = game;
-		std::cout << "Game JSON: " << gameJson.dump(4) << std::endl;
-		ws->send(gameJson.dump(), opCode);
+		cout << "Game JSON: " << gameJson.dump(4) << endl;
+		datas.ws->send(gameJson.dump(), datas.opCode, false);
 	}
-	catch (const nlohmann::json::exception& e) {
-		std::cerr << "JSON 轉換錯誤: " << e.what() << std::endl;
+	catch (const json::exception& e) {
+		cerr << "JSON 轉換錯誤: " << e.what() << endl;
 	}
 }
 
-void sync(webSocket* ws, OpCode opCode, json data) {
+void sync(Data datas) {
 	try {
 		json gameJson = game;
-		ws->send(gameJson.dump(), opCode);
-		std::cout << "Sync game state: " << gameJson.dump(4) << std::endl;
+		datas.ws->send(gameJson.dump(), datas.opCode);
+		cout << "Sync game state: " << gameJson.dump(4) << endl;
 	}
-	catch (const nlohmann::json::exception& e) {
-		std::cerr << "同步錯誤: " << e.what() << std::endl;
+	catch (const json::exception& e) {
+		cerr << "同步錯誤: " << e.what() << endl;
 	}
 }
 
-void save(webSocket* ws, OpCode opCode, json data) {
+void save(Data datas) {
 	game.id = onlineGame.size() + 1; // 手動生成遊戲 ID
 	onlineGame.push_back(game);
 	try {
-		json response = { {"status", "success"}, {"gameId", game.id} };
-		ws->send(response.dump(), opCode);
-		std::cout << "Game saved in memory with ID: " << game.id << std::endl;
+		json response = { {"event", "success"}, {"gameId", game.id} };
+		datas.ws->send(response.dump(), datas.opCode, false);
+		cout << "Game saved in memory with ID: " << game.id << endl;
 	}
-	catch (const nlohmann::json::exception& e) {
-		std::cerr << "保存錯誤: " << e.what() << std::endl;
+	catch (const json::exception& e) {
+		cerr << "保存錯誤: " << e.what() << endl;
 	}
 }
 
-void login(webSocket* ws, OpCode opCode, json data) {
+void login(Data datas) {
+	try {
+		cout << "login" << endl;
 
-	cout << "login" << endl;
+		string strId = datas.data["id"];
+		User user = ReversiDB::getUser(stoi(strId));
 
-	string strId = data["id"];
-	User user = ReversiDB::getUser(stoi(strId));
+		onlineUser[strId] = {
+			{"id",user.id}
+		};
 
-	onlineUser.push_back(user);
-
-	stringstream ss;
-	ss << onlineUser.size();
-	string a = ss.str();
-
-	ws->send(a);
+		datas.ws->send("sucess");
+	}
+	catch (Exception& e) {
+		cerr << e.what() << endl;
+		datas.ws->send("Wrong format.Please try again.");
+	}
 }
 
-void regis(webSocket* ws, OpCode opCode, json data) {
-	int id = ReversiDB::regis(data["name"]);
+void regis(Data datas) {
+	int id = ReversiDB::regis();
 
-	stringstream ss;
-	ss << id;
-	string a = ss.str();
-
-	ws->send(a, opCode, false);
+	datas.ws->send(to_string(id), datas.opCode, false);
 }
 
-void join(webSocket* ws, OpCode opCode, json data) {
+void join(Data datas) {
 	game.initialGame();
 	try {
 		json gameJson = game;
-		ws->send(gameJson.dump(), opCode);
-		std::cout << "User joined game" << std::endl;
+		datas.ws->send(gameJson.dump(), datas.opCode, false);
+		cout << "User joined game" << endl;
 	}
-	catch (const nlohmann::json::exception& e) {
-		std::cerr << "加入遊戲錯誤: " << e.what() << std::endl;
+	catch (const json::exception& e) {
+		cerr << "加入遊戲錯誤: " << e.what() << endl;
 	}
 }
 
-void leave(webSocket* ws, OpCode opCode, json data) {
+void leave(Data datas) {
 	// 假設什麼都不做，只發送確認訊息
 	try {
-		json response = { {"status", "success"}, {"message", "Left game"} };
-		ws->send(response.dump(), opCode);
-		std::cout << "User left game" << std::endl;
+		json response = { {"event", "success"}, {"message", "Left game"} };
+		datas.ws->send(response.dump(), datas.opCode, false);
+		cout << "User left game" << endl;
 	}
-	catch (const nlohmann::json::exception& e) {
-		std::cerr << "離開遊戲錯誤: " << e.what() << std::endl;
+	catch (const json::exception& e) {
+		cerr << "離開遊戲錯誤: " << e.what() << endl;
 	}
 }
 
-void replay(webSocket* ws, OpCode opCode, json data) {
-	int gameId = data["gameId"];
+void replay(Data datas) {
+	int gameId = datas.data["gameId"];
 	for (const auto& g : onlineGame) {
 		if (g.id == gameId) {
 			game = g; // 從 onlineGame 中重播
 			try {
 				json gameJson = game;
-				ws->send(gameJson.dump(), opCode);
-				std::cout << "Replaying game " << gameId << std::endl;
+				datas.ws->send(gameJson.dump(), datas.opCode, false);
+				cout << "Replaying game " << gameId << endl;
 			}
-			catch (const nlohmann::json::exception& e) {
-				std::cerr << "重播錯誤: " << e.what() << std::endl;
+			catch (const json::exception& e) {
+				cerr << "重播錯誤: " << e.what() << endl;
 			}
 			return;
 		}
 	}
-	json response = { {"status", "error"}, {"message", "Game not found"} };
-	ws->send(response.dump(), opCode);
+	json response = { {"event", "error"}, {"message", "Game not found"} };
+	datas.ws->send(response.dump(), datas.opCode, false);
 }
 
-void update(webSocket* ws, OpCode opCode, json data) {
+void update(Data datas) {
 	game.player = (game.player == 1) ? 2 : 1; // 切換玩家
 	try {
 		json gameJson = game;
-		ws->send(gameJson.dump(), opCode);
-		std::cout << "Game updated, current player: " << game.player << std::endl;
+		datas.ws->send(gameJson.dump(), datas.opCode, false);
+		cout << "Game updated, current player: " << game.player << endl;
 	}
-	catch (const nlohmann::json::exception& e) {
-		std::cerr << "更新錯誤: " << e.what() << std::endl;
+	catch (const json::exception& e) {
+		cerr << "更新錯誤: " << e.what() << endl;
 	}
 }
 
-void replayed(webSocket* ws, OpCode opCode, json data) {
-	int gameId = data["gameId"];
+void replayed(Data datas) {
+	int gameId = datas.data["gameId"];
 	try {
-		json response = { {"status", "replayed"}, {"gameId", gameId} };
-		ws->send(response.dump(), opCode);
-		std::cout << "Replay confirmed for game " << gameId << std::endl;
+		json response = { {"event", "replayed"}, {"gameId", gameId} };
+		datas.ws->send(response.dump(), datas.opCode, false);
+		cout << "Replay confirmed for game " << gameId << endl;
 	}
-	catch (const nlohmann::json::exception& e) {
-		std::cerr << "重播確認錯誤: " << e.what() << std::endl;
+	catch (const json::exception& e) {
+		cerr << "重播確認錯誤: " << e.what() << endl;
 	}
 }
 
-void joined(webSocket* ws, OpCode opCode, json data) {
+void joined(Data datas) {
 	try {
-		json response = { {"status", "joined"}, {"gameId", game.id} };
-		ws->send(response.dump(), opCode);
-		std::cout << "Join confirmed" << std::endl;
+		json response = { {"event", "joined"}, {"gameId", game.id} };
+		datas.ws->send(response.dump(), datas.opCode, false);
+		cout << "Join confirmed" << endl;
 	}
-	catch (const nlohmann::json::exception& e) {
-		std::cerr << "加入確認錯誤: " << e.what() << std::endl;
+	catch (const json::exception& e) {
+		cerr << "加入確認錯誤: " << e.what() << endl;
 	}
 }
 
 
-map<string, void(*)(webSocket* ws, OpCode opCode, json data)> EVENTMAP{
+map<string, void(*)(Data)> EVENTMAP{
 	{"place",place},
 	{"replay",replay},
 	{"undo", undo},
@@ -218,11 +228,12 @@ map<string, void(*)(webSocket* ws, OpCode opCode, json data)> EVENTMAP{
 
 
 int main() {
+	ReversiDB::initDB();
+
 	App().ws<string>("/*", {
 		/* WebSocket 事件處理 */
-		.open = [](auto* ws) {
+		.open = [](webSocket* ws) {
 			cout << "WebSocket 連線成功!" << endl;
-			ReversiDB::initDB();
 		},
 		.message = [](webSocket* ws, string_view message, OpCode opCode) {
 			cout << message << opCode << endl;
@@ -230,7 +241,8 @@ int main() {
 			string socketEvent = response["event"];
 			if (EVENTMAP.find(socketEvent) != EVENTMAP.end()) {
 				try {
-					EVENTMAP[socketEvent](ws, opCode, response);
+					Data data = Data(ws, opCode, response);
+					EVENTMAP[socketEvent](data);
 				}
 				catch (const Exception& e) {
 					cerr << e.what() << endl;
@@ -238,7 +250,7 @@ int main() {
 			}
 			ws->send(message, opCode, false);  // Echo 回傳訊息
 		},
-		.close = [](auto* ws, int /*code*/, std::string_view message) {
+		.close = [](auto* ws, int /*code*/, string_view message) {
 			cout << "bye" << endl;
 		}
 		}).listen(9001, [](auto* token) {
