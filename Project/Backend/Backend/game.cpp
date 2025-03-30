@@ -19,6 +19,12 @@ void calculateScore(vector<vector<int>>& board, int& whiteScore, int& blackScore
 void checkGameOver(vector<vector<int>>& board, int whiteScore, int blackScore);
 
 void Game::initialGame() {
+	player = 1;
+	whiteScore = 2;
+	blackScore = 2;
+	nonValidCount = 0;
+	validSquare.clear();
+	board = vector<vector<int>>(8, vector<int>(8, 0));
 	initialBoard(board);
 	findValidSquare(board, validSquare, player); // 找出初始有效格子
 	findCanEatSquare(board, validSquare, player); // 找出初始可吃格子

@@ -15,15 +15,60 @@ Game game;
 vector<User> onlineUser(1, User());
 vector<Game> onlineGame(1, Game());
 
+// 定義 std::pair<int, int> 的 JSON 轉換
+void to_json(json& j, const pair<int, int>& p) {
+	j = { p.first,p.second };
+}
+
+// 定義 Game 的 JSON 轉換
+void to_json(json& j, const Game& g) {
+	j = json{
+		{"id", g.id},
+		{"player", g.player},
+		{"whiteScore", g.whiteScore},
+		{"blackScore", g.blackScore},
+		{"nonValidCount", g.nonValidCount},
+		{"board", g.board},
+		{"validSquare", g.validSquare},
+		{"pathX", g.pathX},
+		{"pathY", g.pathY}
+	};
+}
+
 // handle function
 void place(webSocket* ws, OpCode opCode, json data) {
 	int x = data["x"];
 	int y = data["y"];
 	game.place(x, y);
+	game.pathX.push_back(x);
+	game.pathY.push_back(y);
+	try {
+		json gameJson = game;
+		std::cout << "Game JSON: " << gameJson.dump(4) << std::endl;
+		ws->send(gameJson.dump(), opCode);
+	}
+	catch (const nlohmann::json::exception& e) {
+		std::cerr << "JSON 轉換錯誤: " << e.what() << std::endl;
+	}
 }
 
 void undo(webSocket* ws, OpCode opCode, json data) {
+	game.pathX.pop_back();
+	game.pathY.pop_back();
+	game.initialGame();
 
+	for(int i = 0; i < game.pathX.size(); i++) {
+		game.place(game.pathX[i], game.pathY[i]);
+	}
+
+	try {
+		json gameJson = game;
+		std::cout << "Game JSON: " << gameJson.dump(4) << std::endl;
+		ws->send(gameJson.dump(), opCode);
+	}
+	catch (const nlohmann::json::exception& e) {
+		std::cerr << "JSON 轉換錯誤: " << e.what() << std::endl;
+	}
 }
 
 void sync(webSocket* ws, OpCode opCode, json data) {
@@ -69,7 +114,7 @@ void leave(webSocket* ws, OpCode opCode, json data) {
 }
 
 void replay(webSocket* ws, OpCode opCode, json data) {
-
+	
 }
 
 void update(webSocket* ws, OpCode opCode, json data) {

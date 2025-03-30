@@ -3,6 +3,7 @@
 #define GAME_H
 
 #include <vector>
+#include <nlohmann/json.hpp>
 using namespace std;
 
 class Game {
@@ -20,6 +21,9 @@ public:
 
     void initialGame();
     void place(int x, int y);
+
+    //convert class into json
+    //NLOHMANN_DEFINE_TYPE_INTRUSIVE(Game, id, player, whiteScore, blackScore, board, validSquare);
 };
 
 #endif
