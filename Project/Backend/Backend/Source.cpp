@@ -8,12 +8,19 @@
 using namespace std;
 using namespace uWS;
 using namespace nlohmann;
-using webSocket = uWS::WebSocket<0, 1, class basic_string<char, struct char_traits<char>, class allocator<char>>>;//alias
+struct Player {
+	int id = 0;
+	int gameId = 0;
+};
+using webSocket = uWS::WebSocket<0, 1, struct Player>;//alias
+//using webSocket = uWS::WebSocket<0, 1, class basic_string<char, struct char_traits<char>, class allocator<char>>>;//alias
 
 Game game;
 
-json onlineUser;
+vector<User> onlineUser;
 vector<Game> onlineGame(1, Game());
+
+map<int, int> UserId;
 
 struct Data {
 	Data(webSocket* _ws, OpCode _opCode, json _data) {
@@ -56,7 +63,7 @@ void place(Data datas) {
 	try {
 		json gameJson = game;
 		cout << "Game JSON: " << gameJson.dump(4) << endl;
-		datas.ws->send(gameJson.dump(), datas.opCode);
+		datas.ws->send(gameJson.dump(), datas.opCode, false);
 	}
 	catch (const json::exception& e) {
 		cerr << "JSON 轉換錯誤: " << e.what() << endl;
@@ -113,9 +120,13 @@ void login(Data datas) {
 		string strId = datas.data["id"];
 		User user = ReversiDB::getUser(stoi(strId));
 
-		onlineUser[strId] = {
-			{"id",user.id}
-		};
+		onlineUser.push_back(user);
+
+		UserId.insert(pair<int, int>(user.id, onlineUser.size() - 1));
+
+		Player* p = datas.ws->getUserData();
+
+		p->id = user.id;
 
 		datas.ws->send("sucess");
 	}
@@ -128,19 +139,41 @@ void login(Data datas) {
 void regis(Data datas) {
 	int id = ReversiDB::regis();
 
-	datas.ws->send(to_string(id), datas.opCode, false);
+	cout << id << endl;
+
+	json repeat = {
+		{"event","registered"},
+		{"id",to_string(id)}
+	};
+
+	datas.ws->send(repeat.dump(), datas.opCode, false);
 }
 
 void join(Data datas) {
-	game.initialGame();
+	/*game.initialGame();
 	try {
+		string gameid = datas.data["id"];
+
+		if (gameid == "new_game_b") {
+
+		}
+		else if (gameid == "new_game_p") {
+
+		}
+		else {
+
+		}
+
 		json gameJson = game;
 		datas.ws->send(gameJson.dump(), datas.opCode, false);
 		cout << "User joined game" << endl;
 	}
 	catch (const json::exception& e) {
 		cerr << "加入遊戲錯誤: " << e.what() << endl;
-	}
+	}*/
+	Player* p = datas.ws->getUserData();
+
+	cout << p->id << endl;
 }
 
 void leave(Data datas) {
@@ -230,7 +263,7 @@ map<string, void(*)(Data)> EVENTMAP{
 int main() {
 	ReversiDB::initDB();
 
-	App().ws<string>("/*", {
+	App().ws<Player>("/*", {
 		/* WebSocket 事件處理 */
 		.open = [](webSocket* ws) {
 			cout << "WebSocket 連線成功!" << endl;
@@ -241,14 +274,13 @@ int main() {
 			string socketEvent = response["event"];
 			if (EVENTMAP.find(socketEvent) != EVENTMAP.end()) {
 				try {
-					Data data = Data(ws, opCode, response);
-					EVENTMAP[socketEvent](data);
+					EVENTMAP[socketEvent](Data(ws, opCode, response));
 				}
 				catch (const Exception& e) {
 					cerr << e.what() << endl;
 				}
 			}
-			ws->send(message, opCode, false);  // Echo 回傳訊息
+			//ws->send(message, opCode, false);  // Echo 回傳訊息
 		},
 		.close = [](auto* ws, int /*code*/, string_view message) {
 			cout << "bye" << endl;

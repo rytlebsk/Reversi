@@ -32,7 +32,7 @@ void ReversiDB::initDB() {
 		return;
 	}
 
-	cout << "¾Þ§@§¹¦¨¡C" << endl;
+	cout << "db initialize success" << endl;
 }
 
 int ReversiDB::regis() {
