@@ -13,6 +13,8 @@ using namespace SQLite;
 
 class ReversiDB
 {
+private:
+	static vector<int> existGame;
 public:
 	ReversiDB() {};
 	~ReversiDB() {};
@@ -20,6 +22,7 @@ public:
 	static void initDB();
 	static User getUser(int);
 	static int regis();
+	static int createGame(User&);
 	static void save(User);
 };
 #endif

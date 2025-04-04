@@ -15,7 +15,7 @@ public:
 
 	int id = 0;
 	vector<int> gameId;
-	vector<Game> game;
+	map<int, Game> gameTable;
 };
 
 #endif

@@ -48,9 +48,13 @@ void to_json(json& j, const Game& g) {
 	j = json{
 		{"id", g.id},
 		{"player", g.player},
+		{"done",g.done},
+		{"hostTimer",g.hostTimer},
+		{"guestTimer",g.guestTimer},
 		{"whiteScore", g.whiteScore},
 		{"blackScore", g.blackScore},
 		{"nonValidCount", g.nonValidCount},
+		{"validSquare", g.validSquare},
 		{"board", g.board},
 		{"validSquare", g.validSquare},
 		{"canEatSaquare", g.canEatSquare},
@@ -279,6 +283,25 @@ void joined(Data datas) {
 	}
 }
 
+void create(Data datas) {
+	Player* p = datas.ws->getUserData();
+	int playerId = p->id;
+	User u = onlineUser[UserId[playerId]];
+	int gameId = ReversiDB::createGame(u);
+
+	cout << gameId << " " << playerId << endl;
+
+	onlineGame.push_back(u.gameTable[gameId]);
+	p->gameId = onlineGame.size() - 1;
+
+	onlineGame[p->gameId].blackScore = 10;
+
+	u.gameTable[gameId] = onlineGame[p->gameId];
+
+	cout << u.gameTable[gameId].blackScore << endl;
+	ReversiDB::save(u);
+}
+
 
 map<string, void(*)(Data)> EVENTMAP{
 	{"place",place},
@@ -293,6 +316,7 @@ map<string, void(*)(Data)> EVENTMAP{
 	{"update",update},
 	{"replayed",replayed},
 	{"joined",joined},
+	{"create",create}
 };
 
 
