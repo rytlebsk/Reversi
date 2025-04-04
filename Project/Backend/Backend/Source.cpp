@@ -33,9 +33,14 @@ struct Data {
 	json data;
 };
 
-// 定義 std::pair<int, int> 的 JSON 轉換
+// 定義 pair<int, int> 的 JSON 轉換
 void to_json(json& j, const pair<int, int>& p) {
 	j = { p.first,p.second };
+}
+
+// 定義 tuple<int, int> 的 JSON 轉換
+void to_json(json& j, const tuple<int, int>& p) {
+	j = { get<0>(p) , get<1>(p) };
 }
 
 // 定義 Game 的 JSON 轉換
@@ -48,22 +53,41 @@ void to_json(json& j, const Game& g) {
 		{"nonValidCount", g.nonValidCount},
 		{"board", g.board},
 		{"validSquare", g.validSquare},
+		{"canEatSaquare", g.canEatSquare},
 		{"pathX", g.pathX},
 		{"pathY", g.pathY}
 	};
 }
 
+json convertCanEatSquare(const unordered_map<tuple<int, int>, vector<pair<int, int>>, TupleHash>& canEatSquare) {
+	json result;
+	for (const auto& [key, value] : canEatSquare) {
+		// 把 tuple<int, int> 轉成 "xy" 這種字串格式
+		string keyStr = to_string(get<0>(key)) + to_string(get<1>(key));
+
+		// 轉換 vector<pair<int, int>> 為 JSON 陣列
+		json valueArray = json::array();
+		for (const auto& p : value) {
+			valueArray.push_back(to_string(p.first) + to_string(p.second));
+		}
+
+		result[keyStr] = valueArray;
+	}
+	return result;
+}
+
 // handle function
 void place(Data datas) {
-	int x = datas.data["x"];
-	int y = datas.data["y"];
+	string position = datas.data["position"];
+	int x = position[0] - '0';
+	int y = position[1] - '0';
 	game.place(x, y);
 	game.pathX.push_back(x);
 	game.pathY.push_back(y);
 	try {
 		json gameJson = game;
-		cout << "Game JSON: " << gameJson.dump(4) << endl;
-		datas.ws->send(gameJson.dump(), datas.opCode, false);
+		//cout << "Game JSON: " << gameJson.dump(4) << endl;
+		//datas.ws->send(gameJson.dump(), datas.opCode, false);
 	}
 	catch (const json::exception& e) {
 		cerr << "JSON 轉換錯誤: " << e.what() << endl;
@@ -82,7 +106,7 @@ void undo(Data datas) {
 	try {
 		json gameJson = game;
 		cout << "Game JSON: " << gameJson.dump(4) << endl;
-		datas.ws->send(gameJson.dump(), datas.opCode, false);
+		//datas.ws->send(gameJson.dump(), datas.opCode, false);
 	}
 	catch (const json::exception& e) {
 		cerr << "JSON 轉換錯誤: " << e.what() << endl;
@@ -150,14 +174,15 @@ void regis(Data datas) {
 }
 
 void join(Data datas) {
-	/*game.initialGame();
+	game.initialGame();
+	/*
 	try {
 		string gameid = datas.data["id"];
 
-		if (gameid == "new_game_b") {
+		if (gameid == "new_game_bot") {
 
 		}
-		else if (gameid == "new_game_p") {
+		else if (gameid == "new_game_player") {
 
 		}
 		else {
@@ -189,33 +214,44 @@ void leave(Data datas) {
 }
 
 void replay(Data datas) {
-	int gameId = datas.data["gameId"];
-	for (const auto& g : onlineGame) {
-		if (g.id == gameId) {
-			game = g; // 從 onlineGame 中重播
-			try {
-				json gameJson = game;
-				datas.ws->send(gameJson.dump(), datas.opCode, false);
-				cout << "Replaying game " << gameId << endl;
-			}
-			catch (const json::exception& e) {
-				cerr << "重播錯誤: " << e.what() << endl;
-			}
-			return;
-		}
+	game.initialGame();
+	vector<vector<vector<int>>> historyGameBoard;
+	historyGameBoard.push_back(game.board);
+	int size = game.pathX.size();
+	for (int i = 0; i < size; i++) {
+		game.place(game.pathX[i], game.pathY[i]);
+		historyGameBoard.push_back(game.board);
 	}
-	json response = { {"event", "error"}, {"message", "Game not found"} };
-	datas.ws->send(response.dump(), datas.opCode, false);
+	try {
+		json response = {
+				{"status","ok"},
+				{"board",historyGameBoard},
+		};
+		datas.ws->send(response.dump(), datas.opCode, false);
+	}
+	catch (const json::exception& e) {
+		json response = {
+			{"status","error"},
+		};
+		datas.ws->send(response.dump(), datas.opCode, false);
+		cerr << "JSON 轉換錯誤: " << e.what() << endl;
+	}
 }
 
 void update(Data datas) {
-	game.player = (game.player == 1) ? 2 : 1; // 切換玩家
 	try {
-		json gameJson = game;
-		datas.ws->send(gameJson.dump(), datas.opCode, false);
-		cout << "Game updated, current player: " << game.player << endl;
+		json p = {
+			{"status","ok"},
+			{"board",game.board},
+			{"canDo",convertCanEatSquare(game.canEatSquare)}
+		};
+		datas.ws->send(p.dump(), datas.opCode, false);
 	}
 	catch (const json::exception& e) {
+		json p = {
+			{"status","update error"}
+		};
+		datas.ws->send(p.dump(), datas.opCode, false);
 		cerr << "更新錯誤: " << e.what() << endl;
 	}
 }

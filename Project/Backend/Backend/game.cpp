@@ -1,10 +1,13 @@
 ﻿#include <vector>
 #include <iostream>
+#include <unordered_map>
+#include <tuple>
 #include "Game.h"
 
 using namespace std;
 
 const int BOARD_SIZE = 8;  // 棋盤是 8x8
+
 struct piece {
 	int row;
 	int col;
@@ -13,7 +16,7 @@ struct piece {
 void initialBoard(vector<vector<int>>& board);
 bool checkPiece(vector<vector<int>>& board, pair<int, int> dir, piece opponent_piece, int player);
 void findValidSquare(vector<vector<int>>& board, vector<pair<int, int>>& validSquare, int player);
-void findCanEatSquare(vector<vector<int>>& board, vector<pair<int, int>>& validSquare, int& player);
+unordered_map<tuple<int,int>,vector<pair<int,int>>,TupleHash> findCanEatSquare(vector<vector<int>>& board, vector<pair<int, int>>& validSquare, int& player);
 bool placePiece(vector<vector<int>>& board, vector<pair<int, int>>& validSquare, pair<int, int> position, int& player);
 void calculateScore(vector<vector<int>>& board, int& whiteScore, int& blackScore);
 void checkGameOver(vector<vector<int>>& board, int whiteScore, int blackScore);
@@ -27,7 +30,7 @@ void Game::initialGame() {
 	board = vector<vector<int>>(8, vector<int>(8, 0));
 	initialBoard(board);
 	findValidSquare(board, validSquare, player); // 找出初始有效格子
-	findCanEatSquare(board, validSquare, player); // 找出初始可吃格子
+	canEatSquare = move(findCanEatSquare(board, validSquare, player)); // 找出初始可吃格子
 	// 測試顯示
 	for (int i = 0; i < board.size(); i++) {
 		for (int j = 0; j < board.size(); j++) {
@@ -49,12 +52,12 @@ void Game::place(int x, int y) {
 	if (placePiece(board, validSquare, { x,y }, player)) {
 		calculateScore(board, whiteScore, blackScore);
 		findValidSquare(board, validSquare, player);
-		findCanEatSquare(board, validSquare, player);
+		canEatSquare = move(findCanEatSquare(board, validSquare, player));
 		if (validSquare.empty()) {
 			nonValidCount++;
 			player = 3 - player;
 			findValidSquare(board, validSquare, player);
-			findCanEatSquare(board, validSquare, player);
+			canEatSquare = move(findCanEatSquare(board, validSquare, player));
 		}
 		nonValidCount = 0;
 	}
@@ -158,13 +161,14 @@ void findValidSquare(vector<vector<int>>& board, vector<pair<int, int>>& validSq
 		}
 	}
 
-	for (pair<int, int> coords : validSquare) {
+	/*for (pair<int, int> coords : validSquare) {
 		board[coords.second][coords.first] = 3; // can be placed
-	}
+	}*/
 
 }
 
-void findCanEatSquare(vector<vector<int>>& board, vector<pair<int, int>>& validSquare, int& player) {
+unordered_map<tuple<int,int>,vector<pair<int,int>>,TupleHash> findCanEatSquare(vector<vector<int>>& board, vector<pair<int, int>>& validSquare, int& player) {
+	unordered_map<tuple<int,int>, vector<pair<int, int>>,TupleHash> canEatSquare;
 	for (int i = 0; i < validSquare.size(); i++) {
 		for (int j = -1; j <= 1; j++) {
 			for (int k = -1; k <= 1; k++) {
@@ -191,7 +195,8 @@ void findCanEatSquare(vector<vector<int>>& board, vector<pair<int, int>>& validS
 							}
 
 							if (board[_y][_x] == 3 - player) {
-								board[_y][_x] = 4;  // 將board上可吃的棋子設定成4
+								canEatSquare[{validSquare[i].first,validSquare[i].second}].push_back(pair<int, int>(_x, _y));
+								//board[_y][_x] = 4;  // 將board上可吃的棋子設定成4
 							}
 							else if (board[_y][_x] == player) {
 								break;  // 遇到我方棋子，停止
@@ -205,6 +210,7 @@ void findCanEatSquare(vector<vector<int>>& board, vector<pair<int, int>>& validS
 			}
 		}
 	}
+	return move(canEatSquare);
 }
 
 bool placePiece(vector<vector<int>>& board, vector<pair<int, int>>& validSquare, pair<int, int> position, int& player) {
@@ -223,7 +229,7 @@ bool placePiece(vector<vector<int>>& board, vector<pair<int, int>>& validSquare,
 					if (x >= 8 || x < 0 || y >= 8 || y < 0) {
 						continue;
 					}
-					if (board[y][x] == 4) {
+					if (board[y][x] == 3 - player) {
 						pair<int, int> direction;
 						direction.first = k;
 						direction.second = j;
@@ -238,7 +244,7 @@ bool placePiece(vector<vector<int>>& board, vector<pair<int, int>>& validSquare,
 									break;
 								}
 
-								if (board[_y][_x] == 4) {
+								if (board[_y][_x] == 3 - player) {
 									board[_y][_x] = player;  // 翻轉
 								}
 								else if (board[_y][_x] == player) {
@@ -253,19 +259,19 @@ bool placePiece(vector<vector<int>>& board, vector<pair<int, int>>& validSquare,
 				}
 			}
 			//remove validSquare from board
-			for (int i = 0; i < board.size(); i++) {
+			/*for (int i = 0; i < board.size(); i++) {
 				for (int j = 0; j < board[0].size(); j++) {
 					board[i][j] = board[i][j] == 3 ? 0 : board[i][j];
 
 				}
-			}
+			}*/
 
 			//return can eat square back to opponent's piece
-			for (int i = 0; i < board.size(); i++) {
+			/*for (int i = 0; i < board.size(); i++) {
 				for (int j = 0; j < board[0].size(); j++) {
 					board[i][j] = board[i][j] == 4 ? 3 - player : board[i][j];
 				}
-			}
+			}*/
 			//switch player
 			player = 3 - player;
 
