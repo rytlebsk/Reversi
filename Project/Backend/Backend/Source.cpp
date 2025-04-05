@@ -18,7 +18,7 @@ using webSocket = uWS::WebSocket<0, 1, struct Player>;//alias
 Game game;
 
 vector<User> onlineUser;
-vector<Game> onlineGame(1, Game());
+vector<Game> onlineGame;
 
 map<int, int> UserId;
 

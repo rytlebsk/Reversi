@@ -32,14 +32,14 @@ void ReversiDB::initDB() {
 		if (countUsersSize.executeStep())dbUserSize = countUsersSize.getColumn(0).getInt();
 
 		Statement countGamesSize(db, "SELECT COUNT(*) FROM games");
-		if (countUsersSize.executeStep())dbGameSize = countGamesSize.getColumn(0).getInt();
+		if (countGamesSize.executeStep())dbGameSize = countGamesSize.getColumn(0).getInt();
 	}
 	catch (const Exception& e) {
 		cerr << "¿ù»~: " << e.what() << endl;
 		return;
 	}
 
-	cout << "db initialize success" << endl;
+	cout << "db initialize success. User:" << dbUserSize << " Game:" << dbGameSize << endl;
 }
 
 int ReversiDB::regis() {
@@ -96,37 +96,21 @@ User ReversiDB::getUser(int playerId) {
 		int idIndex = 0;
 
 		while (searchGame.executeStep()) {
-			cout << "in" << endl;
 			Game game;
 			game.id = searchGame.getColumn(0).getInt();
-			cout << "ok" << endl;
 			game.player = searchGame.getColumn(1).getInt();
-			cout << "ok" << endl;
 			game.done = searchGame.getColumn(2).getInt();
-			cout << "ok" << endl;
 			game.hostTimer = searchGame.getColumn(3).getDouble();
-			cout << "ok" << endl;
 			game.guestTimer = searchGame.getColumn(4).getDouble();
-			cout << "ok" << endl;
 			game.whiteScore = searchGame.getColumn(5).getInt();
-			cout << "ok" << endl;
 			game.blackScore = searchGame.getColumn(6).getInt();
-			cout << "ok" << endl;
 			game.nonValidCount = searchGame.getColumn(7).getInt();
-			cout << "ok" << endl;
-			//cout << searchUser.getColumn(8).getString() << endl;
-			game.validSquare = json::parse(searchUser.getColumn(8).getString())["validSquare"].get<vector<pair<int, int>>>();
-			cout << "ok" << endl;
-			game.board = json::parse(searchUser.getColumn(9).getString())["board"].get<vector<vector<int>>>();
-			cout << "ok" << endl;
-			game.pathX = json::parse(searchUser.getColumn(10).getString())["pathX"].get<vector<int>>();
-			cout << "ok" << endl;
-			game.pathY = json::parse(searchUser.getColumn(11).getString())["pathY"].get<vector<int>>();
-			cout << "ok" << endl;
+			game.validSquare = json::parse(searchGame.getColumn(8).getString())["validSquare"].get<vector<pair<int, int>>>();
+			game.board = json::parse(searchGame.getColumn(9).getString())["board"].get<vector<vector<int>>>();
+			game.pathX = json::parse(searchGame.getColumn(10).getString())["pathX"].get<vector<int>>();
+			game.pathY = json::parse(searchGame.getColumn(11).getString())["pathY"].get<vector<int>>();
 
 			player.gameTable.insert(pair<int, Game>(player.gameId[idIndex], game));
-
-			game.~Game();
 
 			idIndex++;
 		}
@@ -181,11 +165,9 @@ void ReversiDB::save(User player) {
 		saveGame.bind(10, pathX.dump());
 		saveGame.bind(11, pathY.dump());
 
-		cout << validSquare.dump() << endl;
-
 		saveGame.bind(12, i);
 
-		thisGame.~Game();
+		saveGame.exec();
 	}
 }
 
