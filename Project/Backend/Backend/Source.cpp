@@ -152,14 +152,14 @@ void login(Data datas) {
 		User user = ReversiDB::getUser(stoi(strId));
 
 		onlineUser.push_back(user);
-
 		UserId.insert(pair<int, int>(user.id, onlineUser.size() - 1));
 
 		Player* p = datas.ws->getUserData();
-
 		p->id = user.id;
 
 		json gameId = { {"gameId",user.gameId} };
+
+		cout << gameId.dump() << endl;
 
 		datas.ws->send(gameId.dump(), datas.opCode, false);
 	}
@@ -319,10 +319,10 @@ void joined(Data datas) {
 void create(Data datas) {
 	Player* p = datas.ws->getUserData();
 	int playerId = p->id;
-	User u = onlineUser[UserId[playerId]];
-	int gameId = ReversiDB::createGame(u);
+	User& u = onlineUser[UserId[playerId]];
 
-	cout << gameId << " " << playerId << endl;
+	int gameId = ReversiDB::createGame(u);
+	for (int i : u.gameId)cout << i << endl;
 
 	onlineGame.push_back(u.gameTable[gameId]);
 	p->gameId = onlineGame.size() - 1;
@@ -331,8 +331,14 @@ void create(Data datas) {
 
 	u.gameTable[gameId] = onlineGame[p->gameId];
 
-	cout << u.gameTable[gameId].blackScore << endl;
+	onlineGame.erase(onlineGame.begin() + p->gameId);
+	p->gameId = 0;
+
 	ReversiDB::save(u);
+
+	onlineUser.erase(onlineUser.begin() + UserId[p->id]);
+	UserId.erase(UserId.find(p->id));
+	p->id = 0;
 }
 
 

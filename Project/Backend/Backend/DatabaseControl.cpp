@@ -208,7 +208,7 @@ int ReversiDB::createGame(User& player) {
 		dbGameSize++;
 
 		player.gameId.push_back(dbGameSize);
-		player.gameTable.insert(pair<int, Game>(player.gameId[player.gameId.size() - 1], emptyGame));
+		player.gameTable.insert(pair<int, Game>(dbGameSize, emptyGame));
 
 		return dbGameSize;
 	}
