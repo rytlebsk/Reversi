@@ -18,8 +18,10 @@ void ReversiDB::initDB() {
 			"id INTEGER PRIMARY KEY AUTOINCREMENT, "
 			"player INTEGER, "
 			"done INTERGER, "
-			"hostTimer DOUBLE, "
-			"guestTimer DOUBLE, "
+			"whiteId INTERGER, "
+			"blackId INTERGER, "
+			"whiteTimer DOUBLE, "
+			"blackTimer DOUBLE, "
 			"whiteScore INTEGER, "
 			"blackScore INTEGER, "
 			"nonValidCount INTEGER, "
@@ -78,7 +80,7 @@ User ReversiDB::getUser(int playerId) {
 
 		if (!player.gameId.size())return player;
 
-		string query = "SELECT id, player, done, hostTimer, guestTimer, whiteScore, blackScore, nonValidCount, validSquare, board, pathX, pathY "
+		string query = "SELECT id, player, done, whiteId, blackId, whiteTimer, blackTimer, whiteScore, blackScore, nonValidCount, validSquare, board, pathX, pathY "
 			"FROM games WHERE id IN (";
 
 		for (size_t i = 0; i < player.gameId.size(); ++i) {
@@ -100,15 +102,17 @@ User ReversiDB::getUser(int playerId) {
 			game.id = searchGame.getColumn(0).getInt();
 			game.player = searchGame.getColumn(1).getInt();
 			game.done = searchGame.getColumn(2).getInt();
-			game.hostTimer = searchGame.getColumn(3).getDouble();
-			game.guestTimer = searchGame.getColumn(4).getDouble();
-			game.whiteScore = searchGame.getColumn(5).getInt();
-			game.blackScore = searchGame.getColumn(6).getInt();
-			game.nonValidCount = searchGame.getColumn(7).getInt();
-			game.validSquare = json::parse(searchGame.getColumn(8).getString())["validSquare"].get<vector<pair<int, int>>>();
-			game.board = json::parse(searchGame.getColumn(9).getString())["board"].get<vector<vector<int>>>();
-			game.pathX = json::parse(searchGame.getColumn(10).getString())["pathX"].get<vector<int>>();
-			game.pathY = json::parse(searchGame.getColumn(11).getString())["pathY"].get<vector<int>>();
+			game.whiteId = searchGame.getColumn(3).getInt();
+			game.blackId = searchGame.getColumn(4).getInt();
+			game.whiteTimer = searchGame.getColumn(5).getDouble();
+			game.blackTimer = searchGame.getColumn(6).getDouble();
+			game.whiteScore = searchGame.getColumn(7).getInt();
+			game.blackScore = searchGame.getColumn(8).getInt();
+			game.nonValidCount = searchGame.getColumn(9).getInt();
+			game.validSquare = json::parse(searchGame.getColumn(10).getString())["validSquare"].get<vector<pair<int, int>>>();
+			game.board = json::parse(searchGame.getColumn(11).getString())["board"].get<vector<vector<int>>>();
+			game.pathX = json::parse(searchGame.getColumn(12).getString())["pathX"].get<vector<int>>();
+			game.pathY = json::parse(searchGame.getColumn(13).getString())["pathY"].get<vector<int>>();
 
 			player.gameTable.insert(pair<int, Game>(player.gameId[idIndex], game));
 
@@ -141,7 +145,7 @@ void ReversiDB::save(User player) {
 	/*save game*/
 	for (int i : player.gameId) {
 		Statement saveGame(db,
-			"UPDATE games SET player=?, done=?, hostTimer=?, guestTimer=?, "
+			"UPDATE games SET player=?, done=?, whiteId=?, blackId=?, whiteTimer=?, blackTimer=?, "
 			"whiteScore=?, blackScore=?, nonValidCount=?, validSquare=?, board=?, "
 			"pathX=?, pathY=? WHERE id=?;");
 
@@ -149,23 +153,25 @@ void ReversiDB::save(User player) {
 
 		saveGame.bind(1, thisGame.id);
 		saveGame.bind(2, thisGame.done);
-		saveGame.bind(3, thisGame.hostTimer);
-		saveGame.bind(4, thisGame.guestTimer);
-		saveGame.bind(5, thisGame.whiteScore);
-		saveGame.bind(6, thisGame.blackScore);
-		saveGame.bind(7, thisGame.nonValidCount);
+		saveGame.bind(3, thisGame.whiteId);
+		saveGame.bind(4, thisGame.blackId);
+		saveGame.bind(5, thisGame.whiteTimer);
+		saveGame.bind(6, thisGame.blackTimer);
+		saveGame.bind(7, thisGame.whiteScore);
+		saveGame.bind(8, thisGame.blackScore);
+		saveGame.bind(9, thisGame.nonValidCount);
 
 		json validSquare = { {"validSquare", thisGame.validSquare} };
 		json board = { {"board", thisGame.board} };
 		json pathX = { {"pathX", thisGame.pathX} };
 		json pathY = { {"pathY", thisGame.pathY} };
 
-		saveGame.bind(8, validSquare.dump());
-		saveGame.bind(9, board.dump());
-		saveGame.bind(10, pathX.dump());
-		saveGame.bind(11, pathY.dump());
+		saveGame.bind(10, validSquare.dump());
+		saveGame.bind(11, board.dump());
+		saveGame.bind(12, pathX.dump());
+		saveGame.bind(13, pathY.dump());
 
-		saveGame.bind(12, i);
+		saveGame.bind(14, i);
 
 		saveGame.exec();
 	}
@@ -173,8 +179,8 @@ void ReversiDB::save(User player) {
 
 int ReversiDB::createGame(User& player) {
 	try {
-		Statement createGame(db, "INSERT INTO games (player, done, hostTimer, guestTimer, whiteScore, blackScore, nonValidCount, validSquare, board, pathX, pathY) "
-			"VALUES (?,?,?,?,?,?,?,?,?,?,?);");
+		Statement createGame(db, "INSERT INTO games (player, done, whiteId, blackId, whiteTimer, blackTimer, whiteScore, blackScore, nonValidCount, validSquare, board, pathX, pathY) "
+			"VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);");
 
 		json emptyValidSquare = { {"validSquare", json::array()} };
 		json emptyBoard = { {"board", json::array()} };
@@ -188,10 +194,12 @@ int ReversiDB::createGame(User& player) {
 		createGame.bind(5, 0);
 		createGame.bind(6, 0);
 		createGame.bind(7, 0);
-		createGame.bind(8, emptyValidSquare.dump());
-		createGame.bind(9, emptyBoard.dump());
-		createGame.bind(10, emptyPathX.dump());
-		createGame.bind(11, emptyPathY.dump());
+		createGame.bind(8, 0);
+		createGame.bind(9, 0);
+		createGame.bind(10, emptyValidSquare.dump());
+		createGame.bind(11, emptyBoard.dump());
+		createGame.bind(12, emptyPathX.dump());
+		createGame.bind(13, emptyPathY.dump());
 
 		createGame.exec();
 

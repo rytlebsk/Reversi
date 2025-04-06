@@ -19,6 +19,7 @@ Game game;
 
 vector<User> onlineUser;
 vector<Game> onlineGame;
+vector<int> findMatch;
 
 map<int, int> UserId;
 
@@ -49,8 +50,10 @@ void to_json(json& j, const Game& g) {
 		{"id", g.id},
 		{"player", g.player},
 		{"done",g.done},
-		{"hostTimer",g.hostTimer},
-		{"guestTimer",g.guestTimer},
+		{"whiteId",g.whiteId},
+		{"blackId",g.blackId},
+		{"whiteTimer",g.whiteTimer},
+		{"blackTimer",g.blackTimer},
 		{"whiteScore", g.whiteScore},
 		{"blackScore", g.blackScore},
 		{"nonValidCount", g.nonValidCount},
@@ -156,12 +159,23 @@ void login(Data datas) {
 
 		p->id = user.id;
 
-		datas.ws->send("sucess");
+		json gameId = { {"gameId",user.gameId} };
+
+		datas.ws->send(gameId.dump(), datas.opCode, false);
 	}
 	catch (Exception& e) {
 		cerr << e.what() << endl;
 		datas.ws->send("Wrong format.Please try again.");
 	}
+}
+
+void logout(Data datas) {
+	Player* p = datas.ws->getUserData();
+	User u = onlineUser[UserId[p->id]];
+	ReversiDB::save(u);
+
+	onlineUser.erase(onlineUser.begin() + UserId[p->id]);
+	p->id = 0;
 }
 
 void regis(Data datas) {
@@ -179,42 +193,61 @@ void regis(Data datas) {
 
 void join(Data datas) {
 	game.initialGame();
-	/*
+
+	Player* p = datas.ws->getUserData();
+	User u = onlineUser[UserId[p->id]];
 	try {
 		string gameid = datas.data["id"];
 
 		if (gameid == "new_game_bot") {
-
+			int gameId = ReversiDB::createGame(u);
+			onlineGame.push_back(u.gameTable[gameId]);
 		}
 		else if (gameid == "new_game_player") {
+			/*int gameId = ReversiDB::createGame(u);
+			onlineGame.push_back(u.gameTable[gameId]);*/
 
+			findMatch.push_back(p->id);
+
+			if (findMatch.size() >= 2) {
+				//match found
+			}
 		}
 		else {
-
+			onlineGame.push_back(u.gameTable[stoi(gameid)]);
 		}
+		p->gameId = onlineGame.size() - 1;
 
-		json gameJson = game;
+		/*json gameJson = game;
 		datas.ws->send(gameJson.dump(), datas.opCode, false);
-		cout << "User joined game" << endl;
+		cout << "User joined game" << endl;*/
 	}
 	catch (const json::exception& e) {
 		cerr << "加入遊戲錯誤: " << e.what() << endl;
-	}*/
-	Player* p = datas.ws->getUserData();
-
-	cout << p->id << endl;
+	}
 }
 
 void leave(Data datas) {
 	// 假設什麼都不做，只發送確認訊息
-	try {
+	/*try {
 		json response = { {"event", "success"}, {"message", "Left game"} };
 		datas.ws->send(response.dump(), datas.opCode, false);
 		cout << "User left game" << endl;
 	}
 	catch (const json::exception& e) {
 		cerr << "離開遊戲錯誤: " << e.what() << endl;
-	}
+	}*/
+
+	/*save logic*/
+	Player* p = datas.ws->getUserData();
+	User u = onlineUser[UserId[p->id]];
+
+	int gameId = onlineGame[p->gameId].id;
+	u.gameTable[gameId] = onlineGame[p->gameId];
+
+	/*clear impliment*/
+	onlineGame.erase(onlineGame.begin() + p->gameId);
+	p->gameId = 0;
 }
 
 void replay(Data datas) {
@@ -310,6 +343,7 @@ map<string, void(*)(Data)> EVENTMAP{
 	{"sync",sync},
 	{"save",save},
 	{"login",login},
+	{"logout",logout},
 	{"register",regis},
 	{"join",join},
 	{"leave",leave},

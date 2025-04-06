@@ -21,9 +21,12 @@ public:
 	int id; //key -> id
 	int player = 1; // 現在輪到的玩家 1:黑 2:白
 	int done = false;
+	//player id
+	int whiteId;
+	int blackId;
 	//timer
-	double hostTimer;
-	double guestTimer;
+	double whiteTimer;
+	double blackTimer;
 	// score
 	int whiteScore = 2;
 	int blackScore = 2;
