@@ -8,18 +8,19 @@
 using namespace std;
 using namespace uWS;
 using namespace nlohmann;
+using webSocket = uWS::WebSocket<0, 1, struct Player>;//alias
 struct Player {
 	int id = 0;
 	int gameId = 0;
+	webSocket* pWS = nullptr;
 };
-using webSocket = uWS::WebSocket<0, 1, struct Player>;//alias
 //using webSocket = uWS::WebSocket<0, 1, class basic_string<char, struct char_traits<char>, class allocator<char>>>;//alias
 
 Game game;
 
 vector<User> onlineUser;
 vector<Game> onlineGame;
-vector<int> findMatch;
+vector<Player*> findMatch;
 
 map<int, int> UserId;
 
@@ -159,8 +160,6 @@ void login(Data datas) {
 
 		json gameId = { {"gameId",user.gameId} };
 
-		cout << gameId.dump() << endl;
-
 		datas.ws->send(gameId.dump(), datas.opCode, false);
 	}
 	catch (Exception& e) {
@@ -199,28 +198,43 @@ void join(Data datas) {
 	try {
 		string gameid = datas.data["id"];
 
-		if (gameid == "new_game_bot") {
+		if (gameid == "new_game_b") {
 			int gameId = ReversiDB::createGame(u);
 			onlineGame.push_back(u.gameTable[gameId]);
+			p->gameId = onlineGame.size() - 1;
+			datas.ws->send("enter game by id:" + gameId, datas.opCode, false);
 		}
-		else if (gameid == "new_game_player") {
-			/*int gameId = ReversiDB::createGame(u);
-			onlineGame.push_back(u.gameTable[gameId]);*/
-
-			findMatch.push_back(p->id);
+		else if (gameid == "new_game_p") {
+			p->pWS = datas.ws;
+			findMatch.push_back(p);
 
 			if (findMatch.size() >= 2) {
-				//match found
+				Player* p1 = findMatch[0];
+				Player* p2 = findMatch[1];
+				User* u1 = &onlineUser[UserId[p1->id]];
+				User* u2 = &onlineUser[UserId[p2->id]];
+
+				int gameId = ReversiDB::createGame(*u1);
+				u1->gameTable[gameId].whiteId = u1->id;
+				u1->gameTable[gameId].blackId = u2->id;
+				onlineGame.push_back(u1->gameTable[gameId]);
+				p2->gameId = p1->gameId = onlineGame.size() - 1;
+
+				u2->gameId.push_back(gameId);
+				u2->gameTable.insert(pair<int, Game>(gameId, u1->gameTable[gameId]));
+
+				p1->pWS->send("match found", datas.opCode, false);
+				p2->pWS->send("match found", datas.opCode, false);
+
+				for (int i : {1, 2})findMatch.erase(findMatch.begin());
 			}
+			else datas.ws->send("Waiting for match...", datas.opCode, false);
 		}
 		else {
 			onlineGame.push_back(u.gameTable[stoi(gameid)]);
+			p->gameId = onlineGame.size() - 1;
+			datas.ws->send("enter game by id:" + gameid, datas.opCode, false);
 		}
-		p->gameId = onlineGame.size() - 1;
-
-		/*json gameJson = game;
-		datas.ws->send(gameJson.dump(), datas.opCode, false);
-		cout << "User joined game" << endl;*/
 	}
 	catch (const json::exception& e) {
 		cerr << "加入遊戲錯誤: " << e.what() << endl;
