@@ -24,5 +24,6 @@ public:
 	static int regis();
 	static int createGame(User&);
 	static void save(User);
+	//static void saveGame(Game);
 };
 #endif

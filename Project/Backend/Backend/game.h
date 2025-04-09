@@ -18,6 +18,26 @@ struct TupleHash {
 
 class Game {
 public:
+	/*Game() {};
+
+	Game(Game& g) {
+		id = g.id;
+		player = g.player;
+		done = g.done;
+		whiteId = g.whiteId;
+		blackId = g.blackId;
+		whiteTimer = g.whiteTimer;
+		blackTimer = g.blackTimer;
+		whiteScore = g.whiteScore;
+		blackTimer = g.blackTimer;
+		nonValidCount = g.nonValidCount;
+		board = g.board;
+		validSquare = g.validSquare;
+		canEatSquare = g.canEatSquare;
+		pathX = g.pathX;
+		pathY = g.pathY;
+	}*/
+
 	int id; //key -> id
 	int player = 1; // 現在輪到的玩家 1:黑 2:白
 	int done = false;
@@ -39,7 +59,8 @@ public:
 
 	void initialGame();
 	void place(int x, int y);
-	~Game() {};
+
+
 
 	//convert class into json
 	//NLOHMANN_DEFINE_TYPE_INTRUSIVE(Game, id, player, whiteScore, blackScore, board, validSquare);

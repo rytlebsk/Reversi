@@ -16,7 +16,7 @@ struct Player {
 };
 //using webSocket = uWS::WebSocket<0, 1, class basic_string<char, struct char_traits<char>, class allocator<char>>>;//alias
 
-Game game;
+//Game game;
 
 vector<User> onlineUser;
 vector<Game> onlineGame;
@@ -86,6 +86,8 @@ json convertCanEatSquare(const unordered_map<tuple<int, int>, vector<pair<int, i
 
 // handle function
 void place(Data datas) {
+	Player* p = datas.ws->getUserData();
+	Game& game = onlineGame[p->gameId];
 	string position = datas.data["position"];
 	int x = position[0] - '0';
 	int y = position[1] - '0';
@@ -103,6 +105,8 @@ void place(Data datas) {
 }
 
 void undo(Data datas) {
+	Player* p = datas.ws->getUserData();
+	Game& game = onlineGame[p->gameId];
 	game.pathX.pop_back();
 	game.pathY.pop_back();
 	game.initialGame();
@@ -122,27 +126,16 @@ void undo(Data datas) {
 }
 
 void sync(Data datas) {
-	try {
+	/*try {
 		json gameJson = game;
 		datas.ws->send(gameJson.dump(), datas.opCode);
 		cout << "Sync game state: " << gameJson.dump(4) << endl;
 	}
 	catch (const json::exception& e) {
 		cerr << "同步錯誤: " << e.what() << endl;
-	}
-}
+	}*/
 
-void save(Data datas) {
-	game.id = onlineGame.size() + 1; // 手動生成遊戲 ID
-	onlineGame.push_back(game);
-	try {
-		json response = { {"event", "success"}, {"gameId", game.id} };
-		datas.ws->send(response.dump(), datas.opCode, false);
-		cout << "Game saved in memory with ID: " << game.id << endl;
-	}
-	catch (const json::exception& e) {
-		cerr << "保存錯誤: " << e.what() << endl;
-	}
+
 }
 
 void login(Data datas) {
@@ -191,20 +184,27 @@ void regis(Data datas) {
 }
 
 void join(Data datas) {
-	game.initialGame();
-
-	Player* p = datas.ws->getUserData();
-	User u = onlineUser[UserId[p->id]];
 	try {
 		string gameid = datas.data["id"];
 
 		if (gameid == "new_game_b") {
-			int gameId = ReversiDB::createGame(u);
-			onlineGame.push_back(u.gameTable[gameId]);
+			Player* p = datas.ws->getUserData();
+			User* u = &onlineUser[UserId[p->id]];
+
+			int gameId = ReversiDB::createGame(*u);
+			u->gameTable[gameId].whiteId = p->id;
+			u->gameTable[gameId].blackId = p->id;
+			onlineGame.push_back(u->gameTable[gameId]);
+
 			p->gameId = onlineGame.size() - 1;
-			datas.ws->send("enter game by id:" + gameId, datas.opCode, false);
+
+			datas.ws->send(to_string(gameId), datas.opCode, false);
+
+			Game& game = onlineGame[p->gameId];
+			game.initialGame();
 		}
 		else if (gameid == "new_game_p") {
+			Player* p = datas.ws->getUserData();
 			p->pWS = datas.ws;
 			findMatch.push_back(p);
 
@@ -226,15 +226,24 @@ void join(Data datas) {
 				p1->pWS->send("match found", datas.opCode, false);
 				p2->pWS->send("match found", datas.opCode, false);
 
-				for (int i : {1, 2})findMatch.erase(findMatch.begin());
+				for (int i = 0; i < 2; i++)findMatch.erase(findMatch.begin());
+
+				Game& game = onlineGame[p1->gameId];
+				game.initialGame();
 			}
 			else datas.ws->send("Waiting for match...", datas.opCode, false);
 		}
 		else {
-			onlineGame.push_back(u.gameTable[stoi(gameid)]);
+			Player* p = datas.ws->getUserData();
+			User* u = &onlineUser[UserId[p->id]];
+
+			onlineGame.push_back(u->gameTable[stoi(gameid)]);
 			p->gameId = onlineGame.size() - 1;
-			datas.ws->send("enter game by id:" + gameid, datas.opCode, false);
+
+			cout << onlineGame[p->gameId].whiteId << " " << onlineGame[p->gameId].blackId << endl;
+			datas.ws->send(gameid, datas.opCode, false);
 		}
+
 	}
 	catch (const json::exception& e) {
 		cerr << "加入遊戲錯誤: " << e.what() << endl;
@@ -242,29 +251,28 @@ void join(Data datas) {
 }
 
 void leave(Data datas) {
-	// 假設什麼都不做，只發送確認訊息
-	/*try {
-		json response = { {"event", "success"}, {"message", "Left game"} };
-		datas.ws->send(response.dump(), datas.opCode, false);
-		cout << "User left game" << endl;
-	}
-	catch (const json::exception& e) {
-		cerr << "離開遊戲錯誤: " << e.what() << endl;
-	}*/
-
 	/*save logic*/
 	Player* p = datas.ws->getUserData();
-	User u = onlineUser[UserId[p->id]];
+	User* u = &onlineUser[UserId[p->id]];
 
 	int gameId = onlineGame[p->gameId].id;
-	u.gameTable[gameId] = onlineGame[p->gameId];
+	u->gameTable[gameId] = onlineGame[p->gameId];
+
+	//ReversiDB::saveGame(onlineGame[p->gameId]);
+
+	ReversiDB::save(onlineUser[UserId[p->id]]);
+
+	for (Game g : onlineGame)cout << g.id << endl;
 
 	/*clear impliment*/
 	onlineGame.erase(onlineGame.begin() + p->gameId);
+	for (Game g : onlineGame)cout << g.id << endl;
 	p->gameId = 0;
 }
 
 void replay(Data datas) {
+	Player* p = datas.ws->getUserData();
+	Game& game = onlineGame[p->gameId];
 	game.initialGame();
 	vector<vector<vector<int>>> historyGameBoard;
 	historyGameBoard.push_back(game.board);
@@ -290,6 +298,8 @@ void replay(Data datas) {
 }
 
 void update(Data datas) {
+	Player* p = datas.ws->getUserData();
+	Game& game = onlineGame[p->gameId];
 	try {
 		json p = {
 			{"status","ok"},
@@ -304,29 +314,6 @@ void update(Data datas) {
 		};
 		datas.ws->send(p.dump(), datas.opCode, false);
 		cerr << "更新錯誤: " << e.what() << endl;
-	}
-}
-
-void replayed(Data datas) {
-	int gameId = datas.data["gameId"];
-	try {
-		json response = { {"event", "replayed"}, {"gameId", gameId} };
-		datas.ws->send(response.dump(), datas.opCode, false);
-		cout << "Replay confirmed for game " << gameId << endl;
-	}
-	catch (const json::exception& e) {
-		cerr << "重播確認錯誤: " << e.what() << endl;
-	}
-}
-
-void joined(Data datas) {
-	try {
-		json response = { {"event", "joined"}, {"gameId", game.id} };
-		datas.ws->send(response.dump(), datas.opCode, false);
-		cout << "Join confirmed" << endl;
-	}
-	catch (const json::exception& e) {
-		cerr << "加入確認錯誤: " << e.what() << endl;
 	}
 }
 
@@ -355,21 +342,17 @@ void create(Data datas) {
 	p->id = 0;
 }
 
-
 map<string, void(*)(Data)> EVENTMAP{
 	{"place",place},
 	{"replay",replay},
 	{"undo", undo},
 	{"sync",sync},
-	{"save",save},
 	{"login",login},
 	{"logout",logout},
 	{"register",regis},
 	{"join",join},
 	{"leave",leave},
 	{"update",update},
-	{"replayed",replayed},
-	{"joined",joined},
 	{"create",create}
 };
 
@@ -396,7 +379,10 @@ int main() {
 			}
 			//ws->send(message, opCode, false);  // Echo 回傳訊息
 		},
-		.close = [](auto* ws, int /*code*/, string_view message) {
+		.close = [](webSocket* ws, int c, string_view message) {
+			json response;
+			/*leave(Data(ws, opCode, response));
+			logout(Data(ws, opCode, response));*/
 			cout << "bye" << endl;
 		}
 		}).listen(9001, [](auto* token) {

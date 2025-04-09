@@ -151,7 +151,7 @@ void ReversiDB::save(User player) {
 
 		Game thisGame = player.gameTable[i];
 
-		saveGame.bind(1, thisGame.id);
+		saveGame.bind(1, thisGame.player);
 		saveGame.bind(2, thisGame.done);
 		saveGame.bind(3, thisGame.whiteId);
 		saveGame.bind(4, thisGame.blackId);
@@ -174,6 +174,8 @@ void ReversiDB::save(User player) {
 		saveGame.bind(14, i);
 
 		saveGame.exec();
+
+		cout << "Game saved:" << i << endl;
 	}
 }
 
@@ -216,3 +218,38 @@ int ReversiDB::createGame(User& player) {
 		cerr << "register fail cause from " << e.what() << endl;
 	}
 }
+
+//void ReversiDB::saveGame(Game game) {
+//	Statement saveGame(db,
+//		"UPDATE games SET player=?, done=?, whiteId=?, blackId=?, whiteTimer=?, blackTimer=?, "
+//		"whiteScore=?, blackScore=?, nonValidCount=?, validSquare=?, board=?, "
+//		"pathX=?, pathY=? WHERE id=?;");
+//
+//	saveGame.bind(1, game.player);
+//	saveGame.bind(2, game.done);
+//	saveGame.bind(3, game.whiteId);
+//	saveGame.bind(4, game.blackId);
+//	saveGame.bind(5, game.whiteTimer);
+//	saveGame.bind(6, game.blackTimer);
+//	saveGame.bind(7, game.whiteScore);
+//	saveGame.bind(8, game.blackScore);
+//	saveGame.bind(9, game.nonValidCount);
+//
+//	cout << game.blackId << endl;
+//
+//	json validSquare = { {"validSquare", game.validSquare} };
+//	json board = { {"board", game.board} };
+//	json pathX = { {"pathX", game.pathX} };
+//	json pathY = { {"pathY", game.pathY} };
+//
+//	saveGame.bind(10, validSquare.dump());
+//	saveGame.bind(11, board.dump());
+//	saveGame.bind(12, pathX.dump());
+//	saveGame.bind(13, pathY.dump());
+//
+//	saveGame.bind(14, game.id);
+//
+//	saveGame.exec();
+//
+//	cout << "Game saved:" << game.id << endl;
+//}
