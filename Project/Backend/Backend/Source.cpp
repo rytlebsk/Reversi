@@ -1,6 +1,7 @@
 ﻿#include <uwebsockets/App.h>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <chrono>
 #include <sstream>
 #include "Game.h"
 #include "User.h"
@@ -8,21 +9,24 @@
 using namespace std;
 using namespace uWS;
 using namespace nlohmann;
+using namespace chrono;
 using webSocket = uWS::WebSocket<0, 1, struct Player>;//alias
 struct Player {
 	int id = 0;
 	int gameId = 0;
+	chrono::system_clock::time_point lastPlaceTime;
 	webSocket* pWS = nullptr;
 };
-//using webSocket = uWS::WebSocket<0, 1, class basic_string<char, struct char_traits<char>, class allocator<char>>>;//alias
-
 //Game game;
 
 vector<User> onlineUser;
 vector<Game> onlineGame;
 vector<Player*> findMatch;
+vector<int> timerPointer;
 
 map<int, int> UserId;
+map<int, int> MatchId;
+
 
 struct Data {
 	Data(webSocket* _ws, OpCode _opCode, json _data) {
@@ -114,6 +118,31 @@ json convertCanEatSquare(const unordered_map<tuple<int, int>, vector<pair<int, i
 	return result;
 }
 
+void switchTimer(Game& game, Player* white, Player* black) {
+	int& nowPointer = timerPointer[white->gameId];
+	if (!nowPointer)return;
+
+	if (nowPointer == 1) {
+		white->lastPlaceTime = system_clock::now();
+		game.blackTimer -= static_cast<double>((duration_cast<milliseconds>(system_clock::now() - black->lastPlaceTime)).count()) / 1000;
+
+		nowPointer = 2;
+	}
+	else {
+		black->lastPlaceTime = system_clock::now();
+		game.whiteTimer -= static_cast<double>((duration_cast<milliseconds>(system_clock::now() - white->lastPlaceTime)).count()) / 1000;
+
+		nowPointer = 1;
+	}
+	json timer = {
+		{"black",game.blackTimer},
+		{"white",game.whiteTimer}
+	};
+
+	black->pWS->send(timer.dump(), OpCode::TEXT, false);
+	white->pWS->send(timer.dump(), OpCode::TEXT, false);
+}
+
 // handle function
 void place(Data datas) {
 	Player* p = datas.ws->getUserData();
@@ -124,6 +153,8 @@ void place(Data datas) {
 	game.place(x, y);
 	game.pathX.push_back(x);
 	game.pathY.push_back(y);
+
+	switchTimer(game, findMatch[MatchId[game.whiteId]], findMatch[MatchId[game.blackId]]);
 
 	//AI放置
 	ai_place(game);
@@ -284,34 +315,41 @@ void join(Data datas) {
 			datas.ws->send(to_string(gameId), datas.opCode, false);
 
 			onlineGame[p->gameId].initialGame();
+			timerPointer.push_back(0);
 		}
 		else if (gameid == "new_game_p") {
 			Player* p = datas.ws->getUserData();
 			p->pWS = datas.ws;
 			findMatch.push_back(p);
 
-			if (findMatch.size() >= 2) {
-				Player* p1 = findMatch[0];
-				Player* p2 = findMatch[1];
+			if (!(findMatch.size() % 2)) {
+				Player* p1 = findMatch[findMatch.size() - 2];
+				Player* p2 = findMatch[findMatch.size() - 1];
 				User* u1 = &onlineUser[UserId[p1->id]];
 				User* u2 = &onlineUser[UserId[p2->id]];
 
 				int gameId = ReversiDB::createGame(*u1);
-				u1->gameTable[gameId].whiteId = u1->id;
-				u1->gameTable[gameId].blackId = u2->id;
-				onlineGame.push_back(u1->gameTable[gameId]);
-				p2->gameId = p1->gameId = onlineGame.size() - 1;
+				u1->gameTable[gameId].blackId = u1->id;
+				u1->gameTable[gameId].whiteId = u2->id;
+				u1->gameTable[gameId].blackTimer = u1->gameTable[gameId].whiteTimer = 180.9999;
 
 				u2->gameId.push_back(gameId);
 				u2->gameTable.emplace(gameId, u1->gameTable[gameId]);
 
+				MatchId.emplace(p1->id, findMatch.size() - 2);
+				MatchId.emplace(p2->id, findMatch.size() - 1);
+
+				onlineGame.push_back(u1->gameTable[gameId]);
+
 				p1->pWS->send("match found", datas.opCode, false);
 				p2->pWS->send("match found", datas.opCode, false);
 
-				for (int i = 0; i < 2; i++)findMatch.erase(findMatch.begin());
+				p2->gameId = p1->gameId = onlineGame.size() - 1;
+				p2->lastPlaceTime = chrono::system_clock::now();
+				timerPointer.push_back(2);
+				switchTimer(onlineGame[p1->gameId], findMatch[MatchId[p2->id]], findMatch[MatchId[p1->id]]);
 
-				Game& game = onlineGame[p1->gameId];
-				game.initialGame();
+				onlineGame[p1->gameId].initialGame();
 			}
 			else datas.ws->send("Waiting for match...", datas.opCode, false);
 		}
@@ -323,8 +361,9 @@ void join(Data datas) {
 			p->gameId = onlineGame.size() - 1;
 
 			datas.ws->send(gameid, datas.opCode, false);
-		}
 
+			timerPointer.push_back(0);
+		}
 	}
 	catch (const json::exception& e) {
 		cerr << "加入遊戲錯誤: " << e.what() << endl;
@@ -336,13 +375,23 @@ void leave(Data datas) {
 	User* u = &onlineUser[UserId[p->id]];
 
 	int gameId = onlineGame[p->gameId].id;
-	u->gameTable[gameId] = onlineGame[p->gameId];
 
-	ReversiDB::save(*u);
+	if (onlineGame[p->gameId].blackId != onlineGame[p->gameId].whiteId) {
+		User* u1 = &onlineUser[UserId[onlineGame[p->gameId].whiteId]];
+		User* u2 = &onlineUser[UserId[onlineGame[p->gameId].blackId]];
 
-	onlineGame[p->gameId].id = -1;
-	for (Game g : onlineGame)cout << g.id << endl;
-	p->gameId = 0;
+		u1->gameTable[gameId] = u2->gameTable[gameId] = onlineGame[p->gameId];
+		ReversiDB::save(*u1);
+		ReversiDB::save(*u2);
+		onlineGame[p->gameId].id = -1;
+	}
+	else {
+		u->gameTable[gameId] = onlineGame[p->gameId];
+
+		ReversiDB::save(*u);
+		onlineGame[p->gameId].id = -1;
+		p->gameId = 0;
+	}
 }
 
 map<string, void(*)(Data)> EVENTMAP{
@@ -357,11 +406,6 @@ map<string, void(*)(Data)> EVENTMAP{
 	{"leave",leave},
 	{"update",update}
 };
-
-void clean() {
-
-}
-
 
 int main() {
 	ReversiDB::initDB();
