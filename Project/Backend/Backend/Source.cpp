@@ -125,151 +125,6 @@ void undo(Data datas) {
 	}
 }
 
-void sync(Data datas) {
-	/*try {
-		json gameJson = game;
-		datas.ws->send(gameJson.dump(), datas.opCode);
-		cout << "Sync game state: " << gameJson.dump(4) << endl;
-	}
-	catch (const json::exception& e) {
-		cerr << "同步錯誤: " << e.what() << endl;
-	}*/
-
-
-}
-
-void login(Data datas) {
-	try {
-		cout << "login" << endl;
-
-		string strId = datas.data["id"];
-		User user = ReversiDB::getUser(stoi(strId));
-
-		onlineUser.push_back(user);
-		UserId.insert(pair<int, int>(user.id, onlineUser.size() - 1));
-
-		Player* p = datas.ws->getUserData();
-		p->id = user.id;
-
-		json gameId = { {"gameId",user.gameId} };
-
-		datas.ws->send(gameId.dump(), datas.opCode, false);
-	}
-	catch (Exception& e) {
-		cerr << e.what() << endl;
-		datas.ws->send("Wrong format.Please try again.");
-	}
-}
-
-void logout(Data datas) {
-	Player* p = datas.ws->getUserData();
-	User u = onlineUser[UserId[p->id]];
-	ReversiDB::save(u);
-
-	onlineUser.erase(onlineUser.begin() + UserId[p->id]);
-	p->id = 0;
-}
-
-void regis(Data datas) {
-	int id = ReversiDB::regis();
-
-	cout << id << endl;
-
-	json repeat = {
-		{"event","registered"},
-		{"id",to_string(id)}
-	};
-
-	datas.ws->send(repeat.dump(), datas.opCode, false);
-}
-
-void join(Data datas) {
-	try {
-		string gameid = datas.data["id"];
-
-		if (gameid == "new_game_b") {
-			Player* p = datas.ws->getUserData();
-			User* u = &onlineUser[UserId[p->id]];
-
-			int gameId = ReversiDB::createGame(*u);
-			u->gameTable[gameId].whiteId = p->id;
-			u->gameTable[gameId].blackId = p->id;
-			onlineGame.push_back(u->gameTable[gameId]);
-
-			p->gameId = onlineGame.size() - 1;
-
-			datas.ws->send(to_string(gameId), datas.opCode, false);
-
-			Game& game = onlineGame[p->gameId];
-			game.initialGame();
-		}
-		else if (gameid == "new_game_p") {
-			Player* p = datas.ws->getUserData();
-			p->pWS = datas.ws;
-			findMatch.push_back(p);
-
-			if (findMatch.size() >= 2) {
-				Player* p1 = findMatch[0];
-				Player* p2 = findMatch[1];
-				User* u1 = &onlineUser[UserId[p1->id]];
-				User* u2 = &onlineUser[UserId[p2->id]];
-
-				int gameId = ReversiDB::createGame(*u1);
-				u1->gameTable[gameId].whiteId = u1->id;
-				u1->gameTable[gameId].blackId = u2->id;
-				onlineGame.push_back(u1->gameTable[gameId]);
-				p2->gameId = p1->gameId = onlineGame.size() - 1;
-
-				u2->gameId.push_back(gameId);
-				u2->gameTable.insert(pair<int, Game>(gameId, u1->gameTable[gameId]));
-
-				p1->pWS->send("match found", datas.opCode, false);
-				p2->pWS->send("match found", datas.opCode, false);
-
-				for (int i = 0; i < 2; i++)findMatch.erase(findMatch.begin());
-
-				Game& game = onlineGame[p1->gameId];
-				game.initialGame();
-			}
-			else datas.ws->send("Waiting for match...", datas.opCode, false);
-		}
-		else {
-			Player* p = datas.ws->getUserData();
-			User* u = &onlineUser[UserId[p->id]];
-
-			onlineGame.push_back(u->gameTable[stoi(gameid)]);
-			p->gameId = onlineGame.size() - 1;
-
-			cout << onlineGame[p->gameId].whiteId << " " << onlineGame[p->gameId].blackId << endl;
-			datas.ws->send(gameid, datas.opCode, false);
-		}
-
-	}
-	catch (const json::exception& e) {
-		cerr << "加入遊戲錯誤: " << e.what() << endl;
-	}
-}
-
-void leave(Data datas) {
-	/*save logic*/
-	Player* p = datas.ws->getUserData();
-	User* u = &onlineUser[UserId[p->id]];
-
-	int gameId = onlineGame[p->gameId].id;
-	u->gameTable[gameId] = onlineGame[p->gameId];
-
-	//ReversiDB::saveGame(onlineGame[p->gameId]);
-
-	ReversiDB::save(onlineUser[UserId[p->id]]);
-
-	for (Game g : onlineGame)cout << g.id << endl;
-
-	/*clear impliment*/
-	onlineGame.erase(onlineGame.begin() + p->gameId);
-	for (Game g : onlineGame)cout << g.id << endl;
-	p->gameId = 0;
-}
-
 void replay(Data datas) {
 	Player* p = datas.ws->getUserData();
 	Game& game = onlineGame[p->gameId];
@@ -317,29 +172,143 @@ void update(Data datas) {
 	}
 }
 
-void create(Data datas) {
+void sync(Data datas) {
+	/*try {
+		json gameJson = game;
+		datas.ws->send(gameJson.dump(), datas.opCode);
+		cout << "Sync game state: " << gameJson.dump(4) << endl;
+	}
+	catch (const json::exception& e) {
+		cerr << "同步錯誤: " << e.what() << endl;
+	}*/
+
+
+}
+
+void regis(Data datas) {
+	int id = ReversiDB::regis();
+
+	cout << id << endl;
+
+	json repeat = {
+		{"event","registered"},
+		{"id",to_string(id)}
+	};
+
+	datas.ws->send(repeat.dump(), datas.opCode, false);
+}
+
+void login(Data datas) {
+	try {
+		cout << "login" << endl;
+
+		string strId = datas.data["id"];
+		User user = ReversiDB::getUser(stoi(strId));
+
+		onlineUser.push_back(user);
+		UserId.emplace(user.id, onlineUser.size() - 1);
+
+		Player* p = datas.ws->getUserData();
+		p->id = user.id;
+
+		json gameId = { {"gameId",user.gameId} };
+
+		datas.ws->send(gameId.dump(), datas.opCode, false);
+	}
+	catch (Exception& e) {
+		cerr << e.what() << endl;
+		datas.ws->send("Wrong format.Please try again.");
+	}
+}
+
+void logout(Data datas) {
 	Player* p = datas.ws->getUserData();
-	int playerId = p->id;
-	User& u = onlineUser[UserId[playerId]];
+	User* u = &onlineUser[UserId[p->id]];
 
-	int gameId = ReversiDB::createGame(u);
-	for (int i : u.gameId)cout << i << endl;
+	ReversiDB::save(*u);
 
-	onlineGame.push_back(u.gameTable[gameId]);
-	p->gameId = onlineGame.size() - 1;
-
-	onlineGame[p->gameId].blackScore = 10;
-
-	u.gameTable[gameId] = onlineGame[p->gameId];
-
-	onlineGame.erase(onlineGame.begin() + p->gameId);
-	p->gameId = 0;
-
-	ReversiDB::save(u);
-
-	onlineUser.erase(onlineUser.begin() + UserId[p->id]);
-	UserId.erase(UserId.find(p->id));
+	onlineUser[UserId[p->id]].id = -1;
+	UserId.erase(p->id);
 	p->id = 0;
+}
+
+void join(Data datas) {
+	try {
+		string gameid = datas.data["id"];
+
+		if (gameid == "new_game_b") {
+			Player* p = datas.ws->getUserData();
+			User* u = &onlineUser[UserId[p->id]];
+
+			int gameId = ReversiDB::createGame(*u);
+			u->gameTable[gameId].whiteId = u->gameTable[gameId].blackId = p->id;
+			onlineGame.push_back(u->gameTable[gameId]);
+			p->gameId = onlineGame.size() - 1;
+
+			cout << "Create complete" << onlineGame[p->gameId].id << endl;
+
+			datas.ws->send(to_string(gameId), datas.opCode, false);
+
+			onlineGame[p->gameId].initialGame();
+		}
+		else if (gameid == "new_game_p") {
+			Player* p = datas.ws->getUserData();
+			p->pWS = datas.ws;
+			findMatch.push_back(p);
+
+			if (findMatch.size() >= 2) {
+				Player* p1 = findMatch[0];
+				Player* p2 = findMatch[1];
+				User* u1 = &onlineUser[UserId[p1->id]];
+				User* u2 = &onlineUser[UserId[p2->id]];
+
+				int gameId = ReversiDB::createGame(*u1);
+				u1->gameTable[gameId].whiteId = u1->id;
+				u1->gameTable[gameId].blackId = u2->id;
+				onlineGame.push_back(u1->gameTable[gameId]);
+				p2->gameId = p1->gameId = onlineGame.size() - 1;
+
+				u2->gameId.push_back(gameId);
+				u2->gameTable.emplace(gameId, u1->gameTable[gameId]);
+
+				p1->pWS->send("match found", datas.opCode, false);
+				p2->pWS->send("match found", datas.opCode, false);
+
+				for (int i = 0; i < 2; i++)findMatch.erase(findMatch.begin());
+
+				Game& game = onlineGame[p1->gameId];
+				game.initialGame();
+			}
+			else datas.ws->send("Waiting for match...", datas.opCode, false);
+		}
+		else {
+			Player* p = datas.ws->getUserData();
+			User* u = &onlineUser[UserId[p->id]];
+
+			onlineGame.push_back(u->gameTable[stoi(gameid)]);
+			p->gameId = onlineGame.size() - 1;
+
+			datas.ws->send(gameid, datas.opCode, false);
+		}
+
+	}
+	catch (const json::exception& e) {
+		cerr << "加入遊戲錯誤: " << e.what() << endl;
+	}
+}
+
+void leave(Data datas) {
+	Player* p = datas.ws->getUserData();
+	User* u = &onlineUser[UserId[p->id]];
+
+	int gameId = onlineGame[p->gameId].id;
+	u->gameTable[gameId] = onlineGame[p->gameId];
+
+	ReversiDB::save(*u);
+
+	onlineGame[p->gameId].id = -1;
+	for (Game g : onlineGame)cout << g.id << endl;
+	p->gameId = 0;
 }
 
 map<string, void(*)(Data)> EVENTMAP{
@@ -352,9 +321,12 @@ map<string, void(*)(Data)> EVENTMAP{
 	{"register",regis},
 	{"join",join},
 	{"leave",leave},
-	{"update",update},
-	{"create",create}
+	{"update",update}
 };
+
+void clean() {
+
+}
 
 
 int main() {

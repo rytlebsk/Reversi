@@ -23,7 +23,6 @@ public:
 	static User getUser(int);
 	static int regis();
 	static int createGame(User&);
-	static void save(User);
-	//static void saveGame(Game);
+	static void save(const User&);
 };
 #endif

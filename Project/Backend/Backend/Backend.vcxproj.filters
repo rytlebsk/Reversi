@@ -24,9 +24,6 @@
     <ClCompile Include="DatabaseControl.cpp">
       <Filter>來源檔案</Filter>
     </ClCompile>
-    <ClCompile Include="User.cpp">
-      <Filter>來源檔案</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game.h">

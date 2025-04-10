@@ -18,9 +18,9 @@ struct TupleHash {
 
 class Game {
 public:
-	/*Game() {};
+	Game() {};
 
-	Game(Game& g) {
+	Game(const Game& g) {
 		id = g.id;
 		player = g.player;
 		done = g.done;
@@ -29,24 +29,24 @@ public:
 		whiteTimer = g.whiteTimer;
 		blackTimer = g.blackTimer;
 		whiteScore = g.whiteScore;
-		blackTimer = g.blackTimer;
+		blackScore = g.blackScore;
 		nonValidCount = g.nonValidCount;
 		board = g.board;
 		validSquare = g.validSquare;
 		canEatSquare = g.canEatSquare;
 		pathX = g.pathX;
 		pathY = g.pathY;
-	}*/
+	}
 
-	int id; //key -> id
+	int id = 0; //key -> id
 	int player = 1; // 現在輪到的玩家 1:黑 2:白
 	int done = false;
 	//player id
-	int whiteId;
-	int blackId;
+	int whiteId = 0;
+	int blackId = 0;
 	//timer
-	double whiteTimer;
-	double blackTimer;
+	double whiteTimer = 0;
+	double blackTimer = 0;
 	// score
 	int whiteScore = 2;
 	int blackScore = 2;

@@ -10,8 +10,8 @@ using namespace std;
 class User
 {
 public:
-	User();
-	~User();
+	User() {};
+	~User() {};
 
 	int id = 0;
 	vector<int> gameId;

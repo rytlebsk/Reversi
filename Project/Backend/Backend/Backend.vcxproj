@@ -169,7 +169,6 @@
     <ClCompile Include="DatabaseControl.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Source.cpp" />
-    <ClCompile Include="User.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DatabaseControl.h" />
