@@ -22,7 +22,6 @@ struct Player {
 vector<User> onlineUser;
 vector<Game> onlineGame;
 vector<Player*> findMatch;
-vector<int> timerPointer;
 
 map<int, int> UserId;
 map<int, int> MatchId;
@@ -118,21 +117,18 @@ json convertCanEatSquare(const unordered_map<tuple<int, int>, vector<pair<int, i
 	return result;
 }
 
-void switchTimer(Game& game, Player* white, Player* black) {
-	int& nowPointer = timerPointer[white->gameId];
+void switchTimer(Game& game) {
+	Player* white = findMatch[MatchId[game.whiteId]], * black = findMatch[MatchId[game.blackId]];
+	int nowPointer = game.player;
 	if (!nowPointer)return;
 
 	if (nowPointer == 1) {
-		white->lastPlaceTime = system_clock::now();
-		game.blackTimer -= static_cast<double>((duration_cast<milliseconds>(system_clock::now() - black->lastPlaceTime)).count()) / 1000;
-
-		nowPointer = 2;
-	}
-	else {
 		black->lastPlaceTime = system_clock::now();
 		game.whiteTimer -= static_cast<double>((duration_cast<milliseconds>(system_clock::now() - white->lastPlaceTime)).count()) / 1000;
-
-		nowPointer = 1;
+	}
+	else {
+		white->lastPlaceTime = system_clock::now();
+		game.blackTimer -= static_cast<double>((duration_cast<milliseconds>(system_clock::now() - black->lastPlaceTime)).count()) / 1000;
 	}
 	json timer = {
 		{"black",game.blackTimer},
@@ -154,7 +150,7 @@ void place(Data datas) {
 	game.pathX.push_back(x);
 	game.pathY.push_back(y);
 
-	switchTimer(game, findMatch[MatchId[game.whiteId]], findMatch[MatchId[game.blackId]]);
+	switchTimer(game);
 
 	//AI放置
 	ai_place(game);
@@ -227,6 +223,7 @@ void update(Data datas) {
 			{"canDo",convertCanEatSquare(game.canEatSquare)}
 		};
 		datas.ws->send(p.dump(), datas.opCode, false);
+
 	}
 	catch (const json::exception& e) {
 		json p = {
@@ -315,7 +312,6 @@ void join(Data datas) {
 			datas.ws->send(to_string(gameId), datas.opCode, false);
 
 			onlineGame[p->gameId].initialGame();
-			timerPointer.push_back(0);
 		}
 		else if (gameid == "new_game_p") {
 			Player* p = datas.ws->getUserData();
@@ -331,7 +327,7 @@ void join(Data datas) {
 				int gameId = ReversiDB::createGame(*u1);
 				u1->gameTable[gameId].blackId = u1->id;
 				u1->gameTable[gameId].whiteId = u2->id;
-				u1->gameTable[gameId].blackTimer = u1->gameTable[gameId].whiteTimer = 180.9999;
+				u1->gameTable[gameId].blackTimer = u1->gameTable[gameId].whiteTimer = 180;
 
 				u2->gameId.push_back(gameId);
 				u2->gameTable.emplace(gameId, u1->gameTable[gameId]);
@@ -341,13 +337,15 @@ void join(Data datas) {
 
 				onlineGame.push_back(u1->gameTable[gameId]);
 
-				p1->pWS->send("match found", datas.opCode, false);
-				p2->pWS->send("match found", datas.opCode, false);
+				json res1 = { {"role","black"} };
+				json res2 = { {"role","white"} };
+
+				p1->pWS->send(res1.dump(), OpCode::TEXT, false);
+				p2->pWS->send(res2.dump(), OpCode::TEXT, false);
 
 				p2->gameId = p1->gameId = onlineGame.size() - 1;
 				p2->lastPlaceTime = chrono::system_clock::now();
-				timerPointer.push_back(2);
-				switchTimer(onlineGame[p1->gameId], findMatch[MatchId[p2->id]], findMatch[MatchId[p1->id]]);
+				switchTimer(onlineGame[p1->gameId]);
 
 				onlineGame[p1->gameId].initialGame();
 			}
@@ -361,8 +359,6 @@ void join(Data datas) {
 			p->gameId = onlineGame.size() - 1;
 
 			datas.ws->send(gameid, datas.opCode, false);
-
-			timerPointer.push_back(0);
 		}
 	}
 	catch (const json::exception& e) {
@@ -373,25 +369,106 @@ void join(Data datas) {
 void leave(Data datas) {
 	Player* p = datas.ws->getUserData();
 	User* u = &onlineUser[UserId[p->id]];
+	Game game = onlineGame[p->gameId];
 
 	int gameId = onlineGame[p->gameId].id;
 
-	if (onlineGame[p->gameId].blackId != onlineGame[p->gameId].whiteId) {
-		User* u1 = &onlineUser[UserId[onlineGame[p->gameId].whiteId]];
-		User* u2 = &onlineUser[UserId[onlineGame[p->gameId].blackId]];
+	if (game.blackId != game.whiteId) {
+		Player* p1 = findMatch[MatchId[game.blackId]];
+		Player* p2 = findMatch[MatchId[game.whiteId]];
+		User* u1 = &onlineUser[UserId[p1->id]];
+		User* u2 = &onlineUser[UserId[p2->id]];
 
 		u1->gameTable[gameId] = u2->gameTable[gameId] = onlineGame[p->gameId];
 		ReversiDB::save(*u1);
 		ReversiDB::save(*u2);
 		onlineGame[p->gameId].id = -1;
+
+		if (p->id == p1->id) {
+			if (!game.done) {
+				json res1 = {
+					{"event","left"},
+					{"status",4},
+					{"done",game.done}
+				};
+				json res2 = {
+					{"event","left"},
+					{"status",5},
+					{"done",game.done}
+				};
+				p1->pWS->send(res1.dump(), OpCode::TEXT, false);
+				p2->pWS->send(res2.dump(), OpCode::TEXT, false);
+			}
+			else {
+				json res = {
+					{"event","left"},
+					{"status",3},
+					{"done",game.done}
+				};
+				p1->pWS->send(res.dump(), OpCode::TEXT, false);
+				p2->pWS->send(res.dump(), OpCode::TEXT, false);
+			}
+		}
+		else {
+			if (!game.done) {
+				json res1 = {
+					{"event","left"},
+					{"status",5},
+					{"done",game.done}
+				};
+				json res2 = {
+					{"event","left"},
+					{"status",4},
+					{"done",game.done}
+				};
+				p1->pWS->send(res1.dump(), OpCode::TEXT, false);
+				p2->pWS->send(res2.dump(), OpCode::TEXT, false);
+			}
+			else {
+				json res = {
+					{"event","left"},
+					{"status",3},
+					{"done",game.done}
+				};
+				p1->pWS->send(res.dump(), OpCode::TEXT, false);
+				p2->pWS->send(res.dump(), OpCode::TEXT, false);
+			}
+		}
+		p1->gameId = p2->gameId = 0;
 	}
 	else {
-		u->gameTable[gameId] = onlineGame[p->gameId];
+		u->gameTable[gameId] = game;
 
 		ReversiDB::save(*u);
+
+		if (!game.done) {
+			json res = {
+				{"event","left"},
+				{"status",2},
+				{"done",game.done}
+			};
+			p->pWS->send(res.dump(), OpCode::TEXT, false);
+		}
+		else {
+			json res = {
+				{"event","left"},
+				{"status",1},
+				{"done",game.done}
+			};
+			p->pWS->send(res.dump(), OpCode::TEXT, false);
+		}
+
 		onlineGame[p->gameId].id = -1;
 		p->gameId = 0;
 	}
+}
+
+void timeout(Data datas) {
+	Player* p = datas.ws->getUserData();
+	Game& game = onlineGame[p->gameId];
+
+	game.done = (game.whiteScore > game.blackScore) ? 2 : (game.whiteScore == game.blackScore) ? 3 : 1;
+	leave(datas);
 }
 
 map<string, void(*)(Data)> EVENTMAP{
@@ -404,7 +481,8 @@ map<string, void(*)(Data)> EVENTMAP{
 	{"register",regis},
 	{"join",join},
 	{"leave",leave},
-	{"update",update}
+	{"update",update},
+	{"timeout",timeout}
 };
 
 int main() {
