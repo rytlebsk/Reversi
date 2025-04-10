@@ -35,6 +35,36 @@ struct Data {
 	json data;
 };
 
+//ai place
+void ai_place(Game& game)
+{
+	if (game.blackId == game.whiteId)
+	{
+		size_t maxLength = 0;
+		int bestX, bestY;
+		for (const auto& entry : game.canEatSquare)
+		{
+			// entry.first 是鍵 (tuple<int, int>)
+			int x = std::get<0>(entry.first); // 獲取 x
+			int y = std::get<1>(entry.first); // 獲取 y
+			cout << x << y << endl;
+
+			// entry.second 是值 (vector<pair<int, int>>)
+			size_t length = entry.second.size(); // 獲取 vector 的長度
+
+			if (length > maxLength)
+			{
+				maxLength = length;
+				bestX = x;
+				bestY = y;
+			}
+		}
+		game.place(bestX, bestY);
+		game.pathX.push_back(bestX);
+		game.pathY.push_back(bestY);
+	}
+}
+
 // 定義 pair<int, int> 的 JSON 轉換
 void to_json(json& j, const pair<int, int>& p) {
 	j = { p.first,p.second };
@@ -94,6 +124,10 @@ void place(Data datas) {
 	game.place(x, y);
 	game.pathX.push_back(x);
 	game.pathY.push_back(y);
+
+	//AI放置
+	ai_place(game);
+
 	try {
 		json gameJson = game;
 		//cout << "Game JSON: " << gameJson.dump(4) << endl;

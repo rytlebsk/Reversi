@@ -16,7 +16,7 @@ struct piece {
 void initialBoard(vector<vector<int>>& board);
 bool checkPiece(vector<vector<int>>& board, pair<int, int> dir, piece opponent_piece, int player);
 void findValidSquare(vector<vector<int>>& board, vector<pair<int, int>>& validSquare, int player);
-unordered_map<tuple<int,int>,vector<pair<int,int>>,TupleHash> findCanEatSquare(vector<vector<int>>& board, vector<pair<int, int>>& validSquare, int& player);
+unordered_map<tuple<int, int>, vector<pair<int, int>>, TupleHash> findCanEatSquare(vector<vector<int>>& board, vector<pair<int, int>>& validSquare, int& player);
 bool placePiece(vector<vector<int>>& board, vector<pair<int, int>>& validSquare, pair<int, int> position, int& player);
 void calculateScore(vector<vector<int>>& board, int& whiteScore, int& blackScore);
 void checkGameOver(vector<vector<int>>& board, int whiteScore, int blackScore);
@@ -167,8 +167,8 @@ void findValidSquare(vector<vector<int>>& board, vector<pair<int, int>>& validSq
 
 }
 
-unordered_map<tuple<int,int>,vector<pair<int,int>>,TupleHash> findCanEatSquare(vector<vector<int>>& board, vector<pair<int, int>>& validSquare, int& player) {
-	unordered_map<tuple<int,int>, vector<pair<int, int>>,TupleHash> canEatSquare;
+unordered_map<tuple<int, int>, vector<pair<int, int>>, TupleHash> findCanEatSquare(vector<vector<int>>& board, vector<pair<int, int>>& validSquare, int& player) {
+	unordered_map<tuple<int, int>, vector<pair<int, int>>, TupleHash> canEatSquare;
 	for (int i = 0; i < validSquare.size(); i++) {
 		for (int j = -1; j <= 1; j++) {
 			for (int k = -1; k <= 1; k++) {
@@ -195,7 +195,7 @@ unordered_map<tuple<int,int>,vector<pair<int,int>>,TupleHash> findCanEatSquare(v
 							}
 
 							if (board[_y][_x] == 3 - player) {
-								canEatSquare[{validSquare[i].first,validSquare[i].second}].push_back(pair<int, int>(_x, _y));
+								canEatSquare[{validSquare[i].first, validSquare[i].second}].push_back(pair<int, int>(_x, _y));
 								//board[_y][_x] = 4;  // 將board上可吃的棋子設定成4
 							}
 							else if (board[_y][_x] == player) {
