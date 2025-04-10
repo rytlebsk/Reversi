@@ -40,7 +40,7 @@ public:
 
 	int id = 0; //key -> id
 	int player = 1; // 現在輪到的玩家 1:黑 2:白
-	int done = false;
+	int done = 0; 
 	//player id
 	int whiteId = 0;
 	int blackId = 0;

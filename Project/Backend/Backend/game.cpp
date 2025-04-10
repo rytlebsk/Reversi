@@ -19,7 +19,7 @@ void findValidSquare(vector<vector<int>>& board, vector<pair<int, int>>& validSq
 unordered_map<tuple<int, int>, vector<pair<int, int>>, TupleHash> findCanEatSquare(vector<vector<int>>& board, vector<pair<int, int>>& validSquare, int& player);
 bool placePiece(vector<vector<int>>& board, vector<pair<int, int>>& validSquare, pair<int, int> position, int& player);
 void calculateScore(vector<vector<int>>& board, int& whiteScore, int& blackScore);
-void checkGameOver(vector<vector<int>>& board, int whiteScore, int blackScore);
+int checkGameOver(vector<vector<int>>& board, int whiteScore, int blackScore);
 
 void Game::initialGame() {
 	player = 1;
@@ -41,25 +41,28 @@ void Game::initialGame() {
 }
 
 void Game::place(int x, int y) {
-	if (nonValidCount >= 2) {
+	/*if (nonValidCount >= 2) {
 		// 遊戲結束
 		checkGameOver(board, whiteScore, blackScore);
-	}
-
-	// 遊戲結束判斷
-	checkGameOver(board, whiteScore, blackScore);
+	}*/
 
 	if (placePiece(board, validSquare, { x,y }, player)) {
 		calculateScore(board, whiteScore, blackScore);
 		findValidSquare(board, validSquare, player);
 		canEatSquare = move(findCanEatSquare(board, validSquare, player));
 		if (validSquare.empty()) {
-			nonValidCount++;
+			//nonValidCount++;
 			player = 3 - player;
 			findValidSquare(board, validSquare, player);
+			//next player cant place(game over)
+			if (validSquare.empty()) {
+				calculateScore(board, whiteScore, blackScore);
+				done = (whiteScore > blackScore) ? 2 : (whiteScore == blackScore) ? 3 : 1;
+				return;
+			}
 			canEatSquare = move(findCanEatSquare(board, validSquare, player));
 		}
-		nonValidCount = 0;
+		//nonValidCount = 0;
 	}
 	// 測試顯示
 	for (int i = 0; i < board.size(); i++) {
@@ -68,6 +71,9 @@ void Game::place(int x, int y) {
 		}
 		cout << endl;
 	}
+
+	// 遊戲結束判斷
+	done = checkGameOver(board, whiteScore, blackScore);
 }
 
 
@@ -296,16 +302,17 @@ void calculateScore(vector<vector<int>>& board, int& whiteScore, int& blackScore
 		}
 	}
 }
+int checkGameOver(vector<vector<int>>& board, int whiteScore, int blackScore) {
 
-void checkGameOver(vector<vector<int>>& board, int whiteScore, int blackScore) {
 	for (int i = 0; i < board.size(); i++) {
 		for (int j = 0; j < board[i].size(); j++) {
 			if (board[i][j] == 0) {
-				return;
+				return 0;
 			}
 		}
 	}
 	// game over
+	return (whiteScore > blackScore) ? 2 : (whiteScore == blackScore) ? 3 : 1;
 }
 
 
