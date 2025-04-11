@@ -119,7 +119,7 @@ json convertCanEatSquare(const unordered_map<tuple<int, int>, vector<pair<int, i
 }
 
 void switchTimer(Game& game) {
-	if ((game.blackId != game.whiteId) || !game.blackId)return;
+	if ((game.blackId == game.whiteId) || !game.blackId)return;
 
 	Player* white = findMatch[MatchId[game.whiteId]], * black = findMatch[MatchId[game.blackId]];
 	int nowPointer = game.player;
