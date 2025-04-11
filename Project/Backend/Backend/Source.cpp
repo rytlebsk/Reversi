@@ -43,6 +43,7 @@ void ai_place(Game& game)
 {
 	if (game.blackId == game.whiteId)
 	{
+		if (game.player == 1 || !game.blackId)return;
 		size_t maxLength = 0;
 		int bestX, bestY;
 		for (const auto& entry : game.canEatSquare)
@@ -118,6 +119,8 @@ json convertCanEatSquare(const unordered_map<tuple<int, int>, vector<pair<int, i
 }
 
 void switchTimer(Game& game) {
+	if ((game.blackId != game.whiteId) || !game.blackId)return;
+
 	Player* white = findMatch[MatchId[game.whiteId]], * black = findMatch[MatchId[game.blackId]];
 	int nowPointer = game.player;
 	if (!nowPointer)return;
@@ -131,8 +134,13 @@ void switchTimer(Game& game) {
 		game.blackTimer -= static_cast<double>((duration_cast<milliseconds>(system_clock::now() - black->lastPlaceTime)).count()) / 1000;
 	}
 	json timer = {
-		{"black",game.blackTimer},
-		{"white",game.whiteTimer}
+		{"event","sync"},
+		{"timer",
+			{
+				{"black",game.blackTimer},
+				{"white",game.whiteTimer}
+			}
+		}
 	};
 
 	black->pWS->send(timer.dump(), OpCode::TEXT, false);
@@ -199,7 +207,7 @@ void replay(Data datas) {
 	}
 	try {
 		json response = {
-				{"status","ok"},
+				{"event","replayed"},
 				{"board",historyGameBoard},
 		};
 		datas.ws->send(response.dump(), datas.opCode, false);
@@ -220,7 +228,8 @@ void update(Data datas) {
 		json p = {
 			{"status","ok"},
 			{"board",game.board},
-			{"canDo",convertCanEatSquare(game.canEatSquare)}
+			{"canDo",convertCanEatSquare(game.canEatSquare)},
+			{"player",game.player == 1 ? "black" : "white"}
 		};
 		datas.ws->send(p.dump(), datas.opCode, false);
 
@@ -273,9 +282,25 @@ void login(Data datas) {
 		Player* p = datas.ws->getUserData();
 		p->id = user.id;
 
-		json gameId = { {"gameId",user.gameId} };
+		vector<int> done;
+
+		for (int i : user.gameId) {
+			done.push_back(user.gameTable[i].done);
+		}
+
+		json gameId = {
+			{"loginStatus","success"},
+			{"saveGame",user.gameId} ,
+			{"done",done}
+		};
 
 		datas.ws->send(gameId.dump(), datas.opCode, false);
+	}
+	catch (runtime_error& r) {
+		json gameId = {
+			{"loginStatus","fail"}
+		};
+		datas.ws->send(gameId.dump(), OpCode::TEXT, false);
 	}
 	catch (Exception& e) {
 		cerr << e.what() << endl;
@@ -309,7 +334,13 @@ void join(Data datas) {
 
 			cout << "Create complete" << onlineGame[p->gameId].id << endl;
 
-			datas.ws->send(to_string(gameId), datas.opCode, false);
+			json joined = {
+				{"event","joined"},
+				{"id","bot"},
+				{"role","black"}
+			};
+
+			datas.ws->send(joined.dump(), datas.opCode, false);
 
 			onlineGame[p->gameId].initialGame();
 		}
@@ -337,8 +368,16 @@ void join(Data datas) {
 
 				onlineGame.push_back(u1->gameTable[gameId]);
 
-				json res1 = { {"role","black"} };
-				json res2 = { {"role","white"} };
+				json res1 = {
+					{"event","joined"},
+					{"id",to_string(p2->id)},
+					{"role","black"}
+				};
+				json res2 = {
+					{"event","joined"},
+					{"id",to_string(p1->id)},
+					{"role","white"}
+				};
 
 				p1->pWS->send(res1.dump(), OpCode::TEXT, false);
 				p2->pWS->send(res2.dump(), OpCode::TEXT, false);
@@ -351,6 +390,27 @@ void join(Data datas) {
 			}
 			else datas.ws->send("Waiting for match...", datas.opCode, false);
 		}
+		else if (gameid == "new_game_l") {
+			Player* p = datas.ws->getUserData();
+			User* u = &onlineUser[UserId[p->id]];
+
+			int gameId = ReversiDB::createGame(*u);
+			u->gameTable[gameId].whiteId = u->gameTable[gameId].blackId = 0;
+			onlineGame.push_back(u->gameTable[gameId]);
+			p->gameId = onlineGame.size() - 1;
+
+			cout << "Create complete" << onlineGame[p->gameId].id << endl;
+
+			json joined = {
+				{"event","joined"},
+				{"id",to_string(p->id)},
+				{"role","black"}
+			};
+
+			datas.ws->send(joined.dump(), datas.opCode, false);
+
+			onlineGame[p->gameId].initialGame();
+		}
 		else {
 			Player* p = datas.ws->getUserData();
 			User* u = &onlineUser[UserId[p->id]];
@@ -358,7 +418,13 @@ void join(Data datas) {
 			onlineGame.push_back(u->gameTable[stoi(gameid)]);
 			p->gameId = onlineGame.size() - 1;
 
-			datas.ws->send(gameid, datas.opCode, false);
+			json joined = {
+				{"event","joined"},
+				{"id","bot"},
+				{"role","black"}
+			};
+
+			datas.ws->send(joined.dump(), datas.opCode, false);
 		}
 	}
 	catch (const json::exception& e) {
@@ -369,7 +435,7 @@ void join(Data datas) {
 void leave(Data datas) {
 	Player* p = datas.ws->getUserData();
 	User* u = &onlineUser[UserId[p->id]];
-	Game game = onlineGame[p->gameId];
+	Game& game = onlineGame[p->gameId];
 
 	int gameId = onlineGame[p->gameId].id;
 
@@ -378,62 +444,20 @@ void leave(Data datas) {
 		Player* p2 = findMatch[MatchId[game.whiteId]];
 		User* u1 = &onlineUser[UserId[p1->id]];
 		User* u2 = &onlineUser[UserId[p2->id]];
-
+		if (!game.done)game.done = (game.whiteScore > game.blackScore) ? 2 : (game.whiteScore == game.blackScore) ? 3 : 1;
 		u1->gameTable[gameId] = u2->gameTable[gameId] = onlineGame[p->gameId];
 		ReversiDB::save(*u1);
 		ReversiDB::save(*u2);
 		onlineGame[p->gameId].id = -1;
 
-		if (p->id == p1->id) {
-			if (!game.done) {
-				json res1 = {
-					{"event","left"},
-					{"status",4},
-					{"done",game.done}
-				};
-				json res2 = {
-					{"event","left"},
-					{"status",5},
-					{"done",game.done}
-				};
-				p1->pWS->send(res1.dump(), OpCode::TEXT, false);
-				p2->pWS->send(res2.dump(), OpCode::TEXT, false);
-			}
-			else {
-				json res = {
-					{"event","left"},
-					{"status",3},
-					{"done",game.done}
-				};
-				p1->pWS->send(res.dump(), OpCode::TEXT, false);
-				p2->pWS->send(res.dump(), OpCode::TEXT, false);
-			}
-		}
-		else {
-			if (!game.done) {
-				json res1 = {
-					{"event","left"},
-					{"status",5},
-					{"done",game.done}
-				};
-				json res2 = {
-					{"event","left"},
-					{"status",4},
-					{"done",game.done}
-				};
-				p1->pWS->send(res1.dump(), OpCode::TEXT, false);
-				p2->pWS->send(res2.dump(), OpCode::TEXT, false);
-			}
-			else {
-				json res = {
-					{"event","left"},
-					{"status",3},
-					{"done",game.done}
-				};
-				p1->pWS->send(res.dump(), OpCode::TEXT, false);
-				p2->pWS->send(res.dump(), OpCode::TEXT, false);
-			}
-		}
+		json res = {
+			{"event","left"},
+			{"status",3},
+			{"done",game.done}
+		};
+		p1->pWS->send(res.dump(), OpCode::TEXT, false);
+		p2->pWS->send(res.dump(), OpCode::TEXT, false);
+
 		p1->gameId = p2->gameId = 0;
 	}
 	else {
@@ -447,7 +471,7 @@ void leave(Data datas) {
 				{"status",2},
 				{"done",game.done}
 			};
-			p->pWS->send(res.dump(), OpCode::TEXT, false);
+			datas.ws->send(res.dump(), OpCode::TEXT, false);
 		}
 		else {
 			json res = {
@@ -455,7 +479,7 @@ void leave(Data datas) {
 				{"status",1},
 				{"done",game.done}
 			};
-			p->pWS->send(res.dump(), OpCode::TEXT, false);
+			datas.ws->send(res.dump(), OpCode::TEXT, false);
 		}
 
 		onlineGame[p->gameId].id = -1;
@@ -471,6 +495,11 @@ void timeout(Data datas) {
 	leave(datas);
 }
 
+void pong(Data datas) {
+	json pong = { {"pong","pong"} };
+	datas.ws->send(pong.dump(), OpCode::TEXT, false);
+}
+
 map<string, void(*)(Data)> EVENTMAP{
 	{"place",place},
 	{"replay",replay},
@@ -482,7 +511,8 @@ map<string, void(*)(Data)> EVENTMAP{
 	{"join",join},
 	{"leave",leave},
 	{"update",update},
-	{"timeout",timeout}
+	{"timeout",timeout},
+	{"ping",pong}
 };
 
 int main() {
@@ -491,7 +521,7 @@ int main() {
 	App().ws<Player>("/*", {
 		/* WebSocket 事件處理 */
 		.open = [](webSocket* ws) {
-			cout << "WebSocket 連線成功!" << endl;
+			cout << "WebSocket connected" << endl;
 		},
 		.message = [](webSocket* ws, string_view message, OpCode opCode) {
 			cout << message << opCode << endl;
@@ -511,11 +541,13 @@ int main() {
 			json response;
 			/*leave(Data(ws, opCode, response));
 			logout(Data(ws, opCode, response));*/
-			cout << "bye" << endl;
+			if (ws->getUserData()->gameId)leave(Data(ws, OpCode::TEXT, response));
+			if (ws->getUserData()->id)logout(Data(ws, OpCode::TEXT, response));
+			cout << "left" << endl;
 		}
 		}).listen(9001, [](auto* token) {
 			if (token) {
-				cout << "伺服器運行在 ws://localhost:9001" << endl;
+				cout << "run on ws://localhost:9001" << endl;
 			}
 			}).run();
 }
