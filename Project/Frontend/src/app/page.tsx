@@ -4,158 +4,67 @@ import { useEffect, useState } from "react";
 
 import styles from "./page.module.css";
 
-const BOARD_SIZE = 8;
-
 export default function Home() {
+  const [id, setId] = useState<string>("");
+  const [socket, setSocket] = useState<WebSocket | null>(null);
   const [selected, setSelected] = useState<string>("");
   const [section, setSection] = useState<string>("");
+  const [contentType, setContentType] = useState<string>("");
+
+  // Game
   const [board, setBoard] = useState<string[][]>([
     ["", "", "", "", "", "", "", ""],
     ["", "", "", "", "", "", "", ""],
     ["", "", "", "", "", "", "", ""],
-    ["", "", "", "X", "O", "", "", ""],
-    ["", "", "", "O", "X", "", "", ""],
     ["", "", "", "", "", "", "", ""],
     ["", "", "", "", "", "", "", ""],
     ["", "", "", "", "", "", "", ""],
-    // ["", "O", "O", "O", "O", "O", "O", "X"],
-    // ["O", "O", "O", "O", "O", "O", "O", "O"],
-    // ["O", "O", "O", "O", "O", "O", "O", "O"],
-    // ["O", "O", "O", "O", "O", "O", "O", "O"],
-    // ["O", "O", "O", "O", "O", "O", "O", "O"],
-    // ["O", "O", "O", "O", "O", "O", "O", "O"],
-    // ["O", "O", "O", "O", "O", "O", "O", "O"],
-    // ["X", "X", "X", "X", "O", "O", "O", "X"],
+    ["", "", "", "", "", "", "", ""],
+    ["", "", "", "", "", "", "", ""],
   ]);
   const [isAffected, setIsAffected] = useState<string[]>([]);
   const [canPlace, setCanPlace] = useState<string[]>([]);
-  const [canPlaceDirs, setCanPlaceDirs] = useState<Record<string, number[][]>>(
-    {}
-  );
+  const [affected, setAffected] = useState<Record<string, string[]>>({});
   const [turn, setTurn] = useState<string>("X");
-  const [player1, setPlayer1] = useState<string>("Black");
-  const [player2, setPlayer2] = useState<string>("White");
+  const [player1, setPlayer1] = useState<string>("");
+  const [player2, setPlayer2] = useState<string>("");
   const [timer1, setTimer1] = useState<number>(300);
   const [timer2, setTimer2] = useState<number>(288);
+
+  // Load
   const [savedGames, setSavedGames] = useState<string[]>(["1", "2", "3"]);
 
-  const [contentType, setContentType] = useState<string>("");
+  // Queue
+  const hint: string[] = [
+    "Your move - make it count!",
+    "Think ahead. Every piece matters.",
+    "Corners win games. Choose wisely.",
+    "A single move can turn the tide.",
+    "Plan. Flip. Dominate.",
+    "Don't rush - strategy beats speed.",
+    "Control the board, control the game.",
+    "Every flip tells a story.",
+    "Watch your opponent. Predict their next step.",
+    "Balance offense and defense - stay sharp.",
+  ];
+  const [queueTimer, setQueueTimer] = useState<number>(0);
+  const [queueHint, setQueueHint] = useState<string>("");
 
-  const handlePlace = (row: number, cell: number, player: string) => {
-    setBoard((prev) => {
-      const newBoard = [...prev];
-      if (newBoard[row][cell]) {
-        newBoard[row][cell] = player;
-      } else {
-        newBoard[row][cell] = player;
-      }
-      return newBoard;
-    });
+  // Handlers
+  const handlePlace = (row: number, cell: number) => {
+    socket?.send(JSON.stringify({ event: "place", position: `${row}${cell}` }));
   };
 
   const handleNextTurn = () => {
     setTurn(turn === "X" ? "O" : "X");
   };
 
-  const handleCalculateCanPlace = (player: string) => {
-    setCanPlace([]);
-    setCanPlaceDirs({});
-    let newCanPlace: string[] = [];
-    let newCanPlaceDirs: Record<string, number[][]> = {};
-    for (let i = 0; i < 8; i++) {
-      for (let j = 0; j < 8; j++) {
-        const cell = board[i][j];
-        const dir = [
-          [0, 1],
-          [1, 1],
-          [1, 0],
-          [1, -1],
-          [0, -1],
-          [-1, -1],
-          [-1, 0],
-          [-1, 1],
-        ];
-        if (cell === "") continue;
-        if (cell === player) continue;
-        for (let d of dir) {
-          let pos = [i, j];
-          while (true) {
-            pos[0] += d[0];
-            pos[1] += d[1];
-            if (i - d[0] < 0 || i - d[0] > BOARD_SIZE - 1) break;
-            if (j - d[1] < 0 || j - d[1] > BOARD_SIZE - 1) break;
-            if (!!board[i - d[0]][j - d[1]]) break;
-            if (pos[0] < 0 || pos[0] > BOARD_SIZE - 1) break;
-            if (pos[1] < 0 || pos[1] > BOARD_SIZE - 1) break;
-            if (!board[pos[0]][pos[1]]) break;
-            if (board[pos[0]][pos[1]] === player) {
-              newCanPlace.push(`${i - d[0]}${j - d[1]}`);
-              newCanPlaceDirs[`${i - d[0]}${j - d[1]}`] = [
-                ...(newCanPlaceDirs[`${i - d[0]}${j - d[1]}`] || []),
-                d,
-              ];
-              break;
-            }
-          }
-        }
-      }
-    }
-    setCanPlace(newCanPlace);
-    setCanPlaceDirs(newCanPlaceDirs);
-    return newCanPlace;
+  const handleAffected = (row: number, cell: number) => {
+    setIsAffected(affected[`${row}${cell}`] || []);
   };
 
-  const handleAffected = (
-    row: number,
-    cell: number,
-    player: string,
-    dirs: number[][]
-  ) => {
-    let newIsAffected: string[] = [];
-    Promise.all(
-      dirs.map(async (dir) => {
-        let pos = [row, cell];
-        while (true) {
-          pos[0] += dir[0];
-          pos[1] += dir[1];
-          if (pos[0] < 0 || pos[0] > BOARD_SIZE - 1) break;
-          if (pos[1] < 0 || pos[1] > BOARD_SIZE - 1) break;
-          if (!board[pos[0]][pos[1]]) break;
-          if (board[pos[0]][pos[1]] === player) break;
-          newIsAffected.push(`${pos[0]}${pos[1]}`);
-        }
-      })
-    );
-    setIsAffected(newIsAffected);
-  };
-
-  const handleFlip = async (
-    row: number,
-    cell: number,
-    player: string,
-    dirs: number[][]
-  ) => {
-    for (let dir of dirs) {
-      Promise.all(
-        dirs.map(async (dir) => {
-          let pos = [row, cell];
-          while (true) {
-            pos[0] += dir[0];
-            pos[1] += dir[1];
-            if (pos[0] < 0 || pos[0] > BOARD_SIZE - 1) break;
-            if (pos[1] < 0 || pos[1] > BOARD_SIZE - 1) break;
-            if (!board[pos[0]][pos[1]]) break;
-            if (board[pos[0]][pos[1]] === player) break;
-            setBoard((prev) => {
-              const newBoard = [...prev];
-              newBoard[pos[0]][pos[1]] = player;
-              return newBoard;
-            });
-            await new Promise((resolve) => setTimeout(resolve, 100));
-          }
-        })
-      );
-    }
+  const handleResetAffected = () => {
+    setIsAffected([]);
   };
 
   const handleSetSection = (section: string) => {
@@ -164,20 +73,129 @@ export default function Home() {
     setTimeout(() => setContentType(section), contentType ? 800 : 0);
   };
 
-  useEffect(() => {
-    handleCalculateCanPlace(turn);
-  }, [board, turn]);
+  const handleFormatTimer = (timer: number) => {
+    let minutes = `${Math.floor(timer / 60)}`;
+    if (minutes.length === 1) minutes = `0${minutes}`;
+    let seconds = `${timer % 60}`;
+    if (seconds.length === 1) seconds = `0${seconds}`;
+    return `${minutes}:${seconds}`;
+  };
+
+  // Effects
+  // useEffect(() => {
+  //   handleCalculateCanPlace(turn);
+  // }, [board, turn]);
+
+  // useEffect(() => {
+  //   if (canPlace.length === 0) {
+  //     handleNextTurn();
+  //   }
+  // }, [canPlace]);
 
   useEffect(() => {
-    if (canPlace.length === 0) {
-      handleNextTurn();
+    const loopHint = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      setQueueHint(hint[Math.floor(Math.random() * hint.length)]);
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      setQueueHint("");
+      loopHint();
+    };
+    loopHint();
+  }, []);
+
+  useEffect(() => {
+    if (!id) {
+      socket?.send(JSON.stringify({ event: "register" }));
+    } else {
+      socket?.send(JSON.stringify({ event: "login", id: id }));
+      setPlayer1(id);
     }
-  }, [canPlace]);
+  }, [id, socket]);
+
+  useEffect(() => {
+    const socket = new WebSocket(`ws://localhost:8080`);
+
+    socket.onopen = () => {
+      console.log("connected");
+      setSocket(socket);
+    };
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      console.log(data);
+      switch (data.event) {
+        case "login":
+          // data = {
+          //   event:,
+          //   id:,
+          //   savedGames:,
+          // }
+          setPlayer1(data.id);
+          setSavedGames(data.savedGames);
+          break;
+        case "registered":
+          // data = {
+          //   event:,
+          //   id:,
+          // }
+          setId(data.id);
+          break;
+        case "joined":
+          // data = {
+          //   event:,
+          //   id:,
+          // }
+          setPlayer2(data.id);
+          break;
+        case "sync":
+          // data = {
+          //   event:,
+          //   player1timer:,
+          //   player2timer:,
+          // }
+          setTimer1(data.player1timer);
+          setTimer2(data.player2timer);
+          break;
+        case "update":
+          // data = {
+          //   event:,
+          //   board:,
+          //   canDo:,
+          // }
+          setBoard(data.board);
+          setCanPlace(Object.keys(data.canDo));
+          setAffected(data.canDo);
+          break;
+      }
+    };
+  }, [socket]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (turn === "X") setTimer1(Math.max(timer1 - 1, 0));
+      if (turn === "O") setTimer2(Math.max(timer2 - 1, 0));
+      if (section === "queue") setQueueTimer(Math.max(queueTimer + 1, 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [timer1, timer2, queueTimer, turn, section]);
+
+  useEffect(() => {
+    const waitForOpponent = async () => {
+      setQueueTimer(0);
+      while (player2 === "") {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+      console.log("opponent found");
+      handleSetSection("game");
+    };
+    if (section !== "queue") return;
+    waitForOpponent();
+  }, [section, player2]);
 
   return (
     <div className={styles.section} data-section={section}>
-      <div className={styles.theme_button} />
       <div className={styles.page}>
+        {/* menu */}
         <div className={styles.menu}>
           <div
             className={`${styles.button} ${
@@ -217,9 +235,9 @@ export default function Home() {
                 ? styles.unSelected
                 : ""
             }`}
-            onClick={() => {
+            onClick={async () => {
               setSelected("onlineGame");
-              handleSetSection("game");
+              handleSetSection("queue");
             }}
           >
             <h2>Online Game</h2>
@@ -228,6 +246,40 @@ export default function Home() {
       </div>
 
       <div className={styles.page}>
+        {/* queue */}
+        {contentType === "queue" && (
+          <div className={styles.queue}>
+            <div className={styles.header}>Queue</div>
+            <div className={styles.timer}>{handleFormatTimer(queueTimer)}</div>
+            <div
+              className={`${styles.hint} ${
+                queueHint ? styles.intro : styles.outro
+              }`}
+            >
+              <div className={styles.title}>Hint</div>
+              <div className={styles.content}>{queueHint}</div>
+            </div>
+            <div className={styles.footer}>
+              <div
+                className={`${styles.button} ${
+                  selected === "back"
+                    ? styles.selected
+                    : selected
+                    ? styles.unSelected
+                    : ""
+                }`}
+                onClick={() => {
+                  setSelected("back");
+                  handleSetSection("");
+                }}
+              >
+                <h2>Back</h2>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* game */}
         {contentType === "game" && (
           <div className={styles.game}>
             <div className={styles.header}>
@@ -279,39 +331,32 @@ export default function Home() {
                             : styles.odd
                         }`}
                       onMouseEnter={() => {
-                        if (!canPlace.includes(`${rowIndex}${cellIndex}`))
-                          return;
-                        handleAffected(
-                          rowIndex,
-                          cellIndex,
-                          turn,
-                          canPlaceDirs[`${rowIndex}${cellIndex}`]
-                        );
+                        handleAffected(rowIndex, cellIndex);
                       }}
                       onMouseLeave={() => {
-                        setIsAffected([]);
+                        handleResetAffected();
                       }}
                       onClick={() => {
                         if (!canPlace.includes(`${rowIndex}${cellIndex}`))
                           return;
-                        handleFlip(
-                          rowIndex,
-                          cellIndex,
-                          turn,
-                          canPlaceDirs[`${rowIndex}${cellIndex}`]
-                        );
-                        handlePlace(rowIndex, cellIndex, turn);
+                        // handleFlip(
+                        //   rowIndex,
+                        //   cellIndex,
+                        //   turn,
+                        //   canPlaceDirs[`${rowIndex}${cellIndex}`]
+                        // );
+                        handlePlace(rowIndex, cellIndex);
                         handleNextTurn();
                       }}
-                      onDoubleClick={() => {
-                        // if (!board[rowIndex][cellIndex]) return;
-                        setBoard((prev) => {
-                          const newBoard = [...prev];
-                          newBoard[rowIndex][cellIndex] = "X";
-                          return newBoard;
-                        });
-                      }}
-                    ></div>
+                      // onDoubleClick={() => {
+                      //   // if (!board[rowIndex][cellIndex]) return;
+                      //   setBoard((prev) => {
+                      //     const newBoard = [...prev];
+                      //     newBoard[rowIndex][cellIndex] = "X";
+                      //     return newBoard;
+                      //   });
+                      // }}
+                    />
                   ))}
                 </div>
               ))}
@@ -336,6 +381,8 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {/* load */}
         {contentType === "load" && (
           <div className={styles.load}>
             {savedGames.map((game, index) => (
