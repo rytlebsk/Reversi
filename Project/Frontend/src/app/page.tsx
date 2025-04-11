@@ -339,23 +339,9 @@ export default function Home() {
                       onClick={() => {
                         if (!canPlace.includes(`${rowIndex}${cellIndex}`))
                           return;
-                        // handleFlip(
-                        //   rowIndex,
-                        //   cellIndex,
-                        //   turn,
-                        //   canPlaceDirs[`${rowIndex}${cellIndex}`]
-                        // );
                         handlePlace(rowIndex, cellIndex);
                         handleNextTurn();
                       }}
-                      // onDoubleClick={() => {
-                      //   // if (!board[rowIndex][cellIndex]) return;
-                      //   setBoard((prev) => {
-                      //     const newBoard = [...prev];
-                      //     newBoard[rowIndex][cellIndex] = "X";
-                      //     return newBoard;
-                      //   });
-                      // }}
                     />
                   ))}
                 </div>
