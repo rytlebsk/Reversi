@@ -1,35 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import styles from "./page.module.css";
+
+const BOARD_SIZE = 8;
 
 export default function Home() {
   const [selected, setSelected] = useState<string>("");
   const [section, setSection] = useState<string>("");
   const [board, setBoard] = useState<string[][]>([
-    // ["", "", "", "", "", "", "", ""],
-    // ["", "", "", "", "", "", "", ""],
-    // ["", "", "", "", "", "", "", ""],
-    // ["", "", "", "X", "O", "", "", ""],
-    // ["", "", "", "O", "X", "", "", ""],
-    // ["", "", "", "", "", "", "", ""],
-    // ["", "", "", "", "", "", "", ""],
-    // ["", "", "", "", "", "", "", ""],
-    ["O", "O", "O", "O", "O", "O", "O", "O"],
-    ["O", "O", "O", "O", "O", "O", "O", "O"],
-    ["O", "O", "O", "O", "O", "O", "O", "O"],
-    ["O", "O", "O", "O", "O", "O", "O", "O"],
-    ["O", "O", "O", "O", "O", "O", "O", "O"],
-    ["O", "O", "O", "O", "O", "O", "O", "O"],
-    ["O", "O", "O", "O", "O", "O", "O", "O"],
-    ["O", "O", "O", "O", "O", "O", "O", "O"],
+    ["", "", "", "", "", "", "", ""],
+    ["", "", "", "", "", "", "", ""],
+    ["", "", "", "", "", "", "", ""],
+    ["", "", "", "X", "O", "", "", ""],
+    ["", "", "", "O", "X", "", "", ""],
+    ["", "", "", "", "", "", "", ""],
+    ["", "", "", "", "", "", "", ""],
+    ["", "", "", "", "", "", "", ""],
+    // ["", "O", "O", "O", "O", "O", "O", "X"],
+    // ["O", "O", "O", "O", "O", "O", "O", "O"],
+    // ["O", "O", "O", "O", "O", "O", "O", "O"],
+    // ["O", "O", "O", "O", "O", "O", "O", "O"],
+    // ["O", "O", "O", "O", "O", "O", "O", "O"],
+    // ["O", "O", "O", "O", "O", "O", "O", "O"],
+    // ["O", "O", "O", "O", "O", "O", "O", "O"],
+    // ["X", "X", "X", "X", "O", "O", "O", "X"],
   ]);
-  const [canPlace, setCanPlace] = useState<string[]>(["45", "56", "67"]);
-  const [isAffected, setIsAffected] = useState<string[]>(["12", "23", "34"]);
+  const [isAffected, setIsAffected] = useState<string[]>([]);
+  const [canPlace, setCanPlace] = useState<string[]>([]);
+  const [canPlaceDirs, setCanPlaceDirs] = useState<Record<string, number[][]>>(
+    {}
+  );
   const [turn, setTurn] = useState<string>("X");
-  const [player1, setPlayer1] = useState<string>("TestPlayer1");
-  const [player2, setPlayer2] = useState<string>("TestPlayer2");
+  const [player1, setPlayer1] = useState<string>("Black");
+  const [player2, setPlayer2] = useState<string>("White");
   const [timer1, setTimer1] = useState<number>(300);
   const [timer2, setTimer2] = useState<number>(288);
   const [savedGames, setSavedGames] = useState<string[]>(["1", "2", "3"]);
@@ -48,14 +53,130 @@ export default function Home() {
     });
   };
 
+  const handleNextTurn = () => {
+    setTurn(turn === "X" ? "O" : "X");
+  };
+
+  const handleCalculateCanPlace = (player: string) => {
+    setCanPlace([]);
+    setCanPlaceDirs({});
+    let newCanPlace: string[] = [];
+    let newCanPlaceDirs: Record<string, number[][]> = {};
+    for (let i = 0; i < 8; i++) {
+      for (let j = 0; j < 8; j++) {
+        const cell = board[i][j];
+        const dir = [
+          [0, 1],
+          [1, 1],
+          [1, 0],
+          [1, -1],
+          [0, -1],
+          [-1, -1],
+          [-1, 0],
+          [-1, 1],
+        ];
+        if (cell === "") continue;
+        if (cell === player) continue;
+        for (let d of dir) {
+          let pos = [i, j];
+          while (true) {
+            pos[0] += d[0];
+            pos[1] += d[1];
+            if (i - d[0] < 0 || i - d[0] > BOARD_SIZE - 1) break;
+            if (j - d[1] < 0 || j - d[1] > BOARD_SIZE - 1) break;
+            if (!!board[i - d[0]][j - d[1]]) break;
+            if (pos[0] < 0 || pos[0] > BOARD_SIZE - 1) break;
+            if (pos[1] < 0 || pos[1] > BOARD_SIZE - 1) break;
+            if (!board[pos[0]][pos[1]]) break;
+            if (board[pos[0]][pos[1]] === player) {
+              newCanPlace.push(`${i - d[0]}${j - d[1]}`);
+              newCanPlaceDirs[`${i - d[0]}${j - d[1]}`] = [
+                ...(newCanPlaceDirs[`${i - d[0]}${j - d[1]}`] || []),
+                d,
+              ];
+              break;
+            }
+          }
+        }
+      }
+    }
+    setCanPlace(newCanPlace);
+    setCanPlaceDirs(newCanPlaceDirs);
+    return newCanPlace;
+  };
+
+  const handleAffected = (
+    row: number,
+    cell: number,
+    player: string,
+    dirs: number[][]
+  ) => {
+    let newIsAffected: string[] = [];
+    Promise.all(
+      dirs.map(async (dir) => {
+        let pos = [row, cell];
+        while (true) {
+          pos[0] += dir[0];
+          pos[1] += dir[1];
+          if (pos[0] < 0 || pos[0] > BOARD_SIZE - 1) break;
+          if (pos[1] < 0 || pos[1] > BOARD_SIZE - 1) break;
+          if (!board[pos[0]][pos[1]]) break;
+          if (board[pos[0]][pos[1]] === player) break;
+          newIsAffected.push(`${pos[0]}${pos[1]}`);
+        }
+      })
+    );
+    setIsAffected(newIsAffected);
+  };
+
+  const handleFlip = async (
+    row: number,
+    cell: number,
+    player: string,
+    dirs: number[][]
+  ) => {
+    for (let dir of dirs) {
+      Promise.all(
+        dirs.map(async (dir) => {
+          let pos = [row, cell];
+          while (true) {
+            pos[0] += dir[0];
+            pos[1] += dir[1];
+            if (pos[0] < 0 || pos[0] > BOARD_SIZE - 1) break;
+            if (pos[1] < 0 || pos[1] > BOARD_SIZE - 1) break;
+            if (!board[pos[0]][pos[1]]) break;
+            if (board[pos[0]][pos[1]] === player) break;
+            setBoard((prev) => {
+              const newBoard = [...prev];
+              newBoard[pos[0]][pos[1]] = player;
+              return newBoard;
+            });
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+        })
+      );
+    }
+  };
+
   const handleSetSection = (section: string) => {
     setTimeout(() => setSection(section), 200);
     setTimeout(() => setSelected(""), 800);
     setTimeout(() => setContentType(section), contentType ? 800 : 0);
   };
 
+  useEffect(() => {
+    handleCalculateCanPlace(turn);
+  }, [board, turn]);
+
+  useEffect(() => {
+    if (canPlace.length === 0) {
+      handleNextTurn();
+    }
+  }, [canPlace]);
+
   return (
     <div className={styles.section} data-section={section}>
+      <div className={styles.theme_button} />
       <div className={styles.page}>
         <div className={styles.menu}>
           <div
@@ -157,19 +278,38 @@ export default function Home() {
                             ? styles.even
                             : styles.odd
                         }`}
+                      onMouseEnter={() => {
+                        if (!canPlace.includes(`${rowIndex}${cellIndex}`))
+                          return;
+                        handleAffected(
+                          rowIndex,
+                          cellIndex,
+                          turn,
+                          canPlaceDirs[`${rowIndex}${cellIndex}`]
+                        );
+                      }}
+                      onMouseLeave={() => {
+                        setIsAffected([]);
+                      }}
                       onClick={() => {
-                        // if (!canPlace.includes(`${rowIndex}${cellIndex}`))
-                        //   return;
+                        if (!canPlace.includes(`${rowIndex}${cellIndex}`))
+                          return;
+                        handleFlip(
+                          rowIndex,
+                          cellIndex,
+                          turn,
+                          canPlaceDirs[`${rowIndex}${cellIndex}`]
+                        );
                         handlePlace(rowIndex, cellIndex, turn);
-                        setTurn(turn === "X" ? "O" : "X");
+                        handleNextTurn();
                       }}
                       onDoubleClick={() => {
                         // if (!board[rowIndex][cellIndex]) return;
-                        // setBoard((prev) => {
-                        //   const newBoard = [...prev];
-                        //   newBoard[rowIndex][cellIndex] = "X";
-                        //   return newBoard;
-                        // });
+                        setBoard((prev) => {
+                          const newBoard = [...prev];
+                          newBoard[rowIndex][cellIndex] = "X";
+                          return newBoard;
+                        });
                       }}
                     ></div>
                   ))}

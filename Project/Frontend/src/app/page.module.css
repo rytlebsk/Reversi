@@ -34,6 +34,7 @@
     opacity: 1;
   }
 }
+
 .header {
   display: flex;
   flex-direction: column;
@@ -230,11 +231,11 @@
 }
 
 .cell:hover.place {
-  background-color: #ffee0020;
+  background-color: #ffee0060;
 }
 
 .cell:hover.affected {
-  background-color: #ff000020;
+  background-color: #ff000060;
 }
 
 .odd {
@@ -375,11 +376,11 @@
 }
 
 .place {
-  background-color: #afa40020;
+  background-color: #afa30040;
 }
 
 .affected {
-  background-color: #a3000020;
+  background-color: #a3000040;
 }
 
 .footer {
