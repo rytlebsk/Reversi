@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import styles from "./page.module.css";
 
+const SOCKET_URL = "wss://cloud-backend-aznm.onrender.com/";
+
 export default function Home() {
-  const [id, setId] = useState<string>("");
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [selected, setSelected] = useState<string>("");
   const [section, setSection] = useState<string>("");
@@ -25,28 +26,43 @@ export default function Home() {
   const [isAffected, setIsAffected] = useState<string[]>([]);
   const [canPlace, setCanPlace] = useState<string[]>([]);
   const [affected, setAffected] = useState<Record<string, string[]>>({});
-  const [turn, setTurn] = useState<string>("X");
+  const [turn, setTurn] = useState<"black" | "white">("black");
   const [player1, setPlayer1] = useState<string>("");
   const [player2, setPlayer2] = useState<string>("");
-  const [timer1, setTimer1] = useState<number>(300);
-  const [timer2, setTimer2] = useState<number>(288);
+  const [timer1, setTimer1] = useState<number>(0);
+  const [timer2, setTimer2] = useState<number>(0);
 
   // Load
-  const [savedGames, setSavedGames] = useState<string[]>(["1", "2", "3"]);
+  const STATUS_CODES = ["Unfinished", "Black Wins", "White Wins", "Tie"];
+  const [savedGames, setSavedGames] = useState<string[]>([]);
+  const [savedGameStatus, setSavedGameStatus] = useState<number[]>([]);
 
   // Queue
-  const hint: string[] = [
-    "Your move - make it count!",
-    "Think ahead. Every piece matters.",
-    "Corners win games. Choose wisely.",
-    "A single move can turn the tide.",
-    "Plan. Flip. Dominate.",
-    "Don't rush - strategy beats speed.",
-    "Control the board, control the game.",
-    "Every flip tells a story.",
-    "Watch your opponent. Predict their next step.",
-    "Balance offense and defense - stay sharp.",
-  ];
+  const HINTS = useMemo(
+    () => [
+      "Your move - make it count!",
+      "Think ahead. Every piece matters.",
+      "Corners win games. Choose wisely.",
+      "A single move can turn the tide.",
+      "Plan. Flip. Dominate.",
+      "Don't rush - strategy beats speed.",
+      "Control the board, control the game.",
+      "Every flip tells a story.",
+      "Watch your opponent. Predict their next step.",
+      "Balance offense and defense - stay sharp.",
+      "The game is won in the mind, not just on the board.",
+      "Timing is everything in chess.",
+      "A good move can turn the tide.",
+      "A bad move can cost you the game.",
+      "Don't be afraid to take risks.",
+      "Every move has consequences.",
+      "The board is your canvas, paint it well.",
+      "Every piece has a story.",
+      "The game is a battle of wits.",
+      "The best moves are the ones you don't see coming.",
+    ],
+    []
+  );
   const [queueTimer, setQueueTimer] = useState<number>(0);
   const [queueHint, setQueueHint] = useState<string>("");
 
@@ -55,9 +71,49 @@ export default function Home() {
     socket?.send(JSON.stringify({ event: "place", position: `${row}${cell}` }));
   };
 
-  const handleNextTurn = () => {
-    setTurn(turn === "X" ? "O" : "X");
+  const handleJoinGame = (
+    type?: "local" | "online" | "bot",
+    gameId?: string
+  ) => {
+    if (gameId) {
+      socket?.send(JSON.stringify({ event: "join", gameId: gameId }));
+    } else if (type === "local") {
+      socket?.send(JSON.stringify({ event: "join", gameId: "new_game_l" }));
+    } else if (type === "online") {
+      socket?.send(JSON.stringify({ event: "join", gameId: "new_game_p" }));
+    } else if (type === "bot") {
+      socket?.send(JSON.stringify({ event: "join", gameId: "new_game_b" }));
+    }
   };
+
+  const handleLeaveGame = () => {
+    socket?.send(JSON.stringify({ event: "leave" }));
+  };
+
+  const handleClear = () => {
+    setBoard([
+      ["", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", ""],
+      ["", "", "", "", "", "", "", ""],
+    ]);
+    setIsAffected([]);
+    setCanPlace([]);
+    setAffected({});
+    setTurn("black");
+    setPlayer1("");
+    setPlayer2("");
+    setTimer1(0);
+    setTimer2(0);
+  };
+
+  // const handleNextTurn = () => {
+  //   setTurn(turn === "black" ? "white" : "black");
+  // };
 
   const handleAffected = (row: number, cell: number) => {
     setIsAffected(affected[`${row}${cell}`] || []);
@@ -67,11 +123,14 @@ export default function Home() {
     setIsAffected([]);
   };
 
-  const handleSetSection = (section: string) => {
-    setTimeout(() => setSection(section), 200);
-    setTimeout(() => setSelected(""), 800);
-    setTimeout(() => setContentType(section), contentType ? 800 : 0);
-  };
+  const handleSetSection = useCallback(
+    (section: string) => {
+      setTimeout(() => setSection(section), 200);
+      setTimeout(() => setSelected(""), 800);
+      setTimeout(() => setContentType(section), contentType ? 800 : 0);
+    },
+    [contentType]
+  );
 
   const handleFormatTimer = (timer: number) => {
     let minutes = `${Math.floor(timer / 60)}`;
@@ -81,43 +140,67 @@ export default function Home() {
     return `${minutes}:${seconds}`;
   };
 
-  // Effects
-  // useEffect(() => {
-  //   handleCalculateCanPlace(turn);
-  // }, [board, turn]);
-
-  // useEffect(() => {
-  //   if (canPlace.length === 0) {
-  //     handleNextTurn();
-  //   }
-  // }, [canPlace]);
-
   useEffect(() => {
     const loopHint = async () => {
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      setQueueHint(hint[Math.floor(Math.random() * hint.length)]);
+      setQueueHint(HINTS[Math.floor(Math.random() * HINTS.length)]);
       await new Promise((resolve) => setTimeout(resolve, 5000));
       setQueueHint("");
       loopHint();
     };
     loopHint();
-  }, []);
+  }, [HINTS]);
 
   useEffect(() => {
-    if (!id) {
-      socket?.send(JSON.stringify({ event: "register" }));
-    } else {
+    const timer = setInterval(() => {
+      if (turn === "black") setTimer1(Math.max(timer1 - 1, 0));
+      if (turn === "white") setTimer2(Math.max(timer2 - 1, 0));
+      if (section === "queue") setQueueTimer(Math.max(queueTimer + 1, 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [timer1, timer2, queueTimer, turn, section]);
+
+  useEffect(() => {
+    if (section !== "queue") return;
+    const waitForOpponent = async () => {
+      setQueueTimer(0);
+      while (player2 === "") {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+      console.log("opponent found");
+      handleSetSection("game");
+    };
+    if (section !== "queue") return;
+    waitForOpponent();
+  }, [section, player2, handleSetSection]);
+
+  useEffect(() => {
+    const id = localStorage.getItem("id");
+
+    if (id) {
       socket?.send(JSON.stringify({ event: "login", id: id }));
-      setPlayer1(id);
+    } else {
+      socket?.send(JSON.stringify({ event: "register" }));
     }
-  }, [id, socket]);
+  }, [socket]);
 
   useEffect(() => {
-    const socket = new WebSocket(`ws://localhost:8080`);
+    const socket = new WebSocket(SOCKET_URL);
 
     socket.onopen = () => {
       console.log("connected");
       setSocket(socket);
+      handleClear();
+    };
+
+    socket.onclose = () => {
+      console.log("disconnected");
+      setSocket(null);
+      handleClear();
+    };
+
+    socket.onerror = (event) => {
+      console.log("error", event);
     };
 
     socket.onmessage = (event) => {
@@ -132,13 +215,17 @@ export default function Home() {
           // }
           setPlayer1(data.id);
           setSavedGames(data.savedGames);
+          setSavedGameStatus(data.done);
           break;
         case "registered":
           // data = {
           //   event:,
           //   id:,
           // }
-          setId(data.id);
+          setPlayer1(data.id);
+          setSavedGames([]);
+          setSavedGameStatus([]);
+          localStorage.setItem("id", data.id);
           break;
         case "joined":
           // data = {
@@ -159,38 +246,25 @@ export default function Home() {
         case "update":
           // data = {
           //   event:,
+          //   turn:,
           //   board:,
           //   canDo:,
           // }
           setBoard(data.board);
           setCanPlace(Object.keys(data.canDo));
           setAffected(data.canDo);
+          setTurn(data.turn);
+          break;
+        case "left":
+          // data = {
+          //   event:,
+          // }
+          setPlayer2("");
+          handleSetSection("");
           break;
       }
     };
-  }, [socket]);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (turn === "X") setTimer1(Math.max(timer1 - 1, 0));
-      if (turn === "O") setTimer2(Math.max(timer2 - 1, 0));
-      if (section === "queue") setQueueTimer(Math.max(queueTimer + 1, 0));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [timer1, timer2, queueTimer, turn, section]);
-
-  useEffect(() => {
-    const waitForOpponent = async () => {
-      setQueueTimer(0);
-      while (player2 === "") {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
-      console.log("opponent found");
-      handleSetSection("game");
-    };
-    if (section !== "queue") return;
-    waitForOpponent();
-  }, [section, player2]);
+  }, [handleSetSection]);
 
   return (
     <div className={styles.section} data-section={section}>
@@ -208,9 +282,26 @@ export default function Home() {
             onClick={() => {
               setSelected("newGame");
               handleSetSection("game");
+              handleJoinGame("local");
             }}
           >
             <h2>New Game</h2>
+          </div>
+          <div
+            className={`${styles.button} ${
+              selected === "newGameBot"
+                ? styles.selected
+                : selected
+                ? styles.unSelected
+                : ""
+            }`}
+            onClick={() => {
+              setSelected("newGameBot");
+              handleSetSection("game");
+              handleJoinGame("bot");
+            }}
+          >
+            <h2>{"New Game (Bot)"}</h2>
           </div>
           <div
             className={`${styles.button} ${
@@ -238,6 +329,7 @@ export default function Home() {
             onClick={async () => {
               setSelected("onlineGame");
               handleSetSection("queue");
+              handleJoinGame("online");
             }}
           >
             <h2>Online Game</h2>
@@ -286,7 +378,7 @@ export default function Home() {
               <div className={`${styles.display} ${styles.left} `}>
                 <div
                   className={`${styles.player} ${
-                    turn === "X" ? styles.turn : ""
+                    turn === "black" ? styles.turn : ""
                   }`}
                 >
                   {player1}
@@ -297,7 +389,7 @@ export default function Home() {
                 <div className={styles.timer}>{timer2}</div>
                 <div
                   className={`${styles.player} ${
-                    turn === "O" ? styles.turn : ""
+                    turn === "white" ? styles.turn : ""
                   }`}
                 >
                   {player2}
@@ -313,8 +405,8 @@ export default function Home() {
                       key={cellIndex}
                       className={`
                         ${styles.cell}
-                        ${cell === "X" ? styles.x : ""} 
-                        ${cell === "O" ? styles.o : ""} 
+                        ${cell === "black" ? styles.black : ""} 
+                        ${cell === "white" ? styles.white : ""} 
                         ${
                           isAffected.includes(`${rowIndex}${cellIndex}`)
                             ? styles.affected
@@ -340,7 +432,6 @@ export default function Home() {
                         if (!canPlace.includes(`${rowIndex}${cellIndex}`))
                           return;
                         handlePlace(rowIndex, cellIndex);
-                        handleNextTurn();
                       }}
                     />
                   ))}
@@ -360,6 +451,7 @@ export default function Home() {
                 onClick={() => {
                   setSelected("back");
                   handleSetSection("");
+                  handleLeaveGame();
                 }}
               >
                 <h2>Back</h2>
@@ -384,9 +476,12 @@ export default function Home() {
                 onClick={() => {
                   setSelected(`save_${game}`);
                   handleSetSection("game");
+                  handleJoinGame("local", game);
                 }}
               >
-                <h2>Slot {index}</h2>
+                <h2>
+                  Slot {index} {STATUS_CODES[savedGameStatus[index]]}
+                </h2>
               </div>
             ))}
 
