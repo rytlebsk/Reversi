@@ -26,6 +26,7 @@ export default function Home() {
   const [isAffected, setIsAffected] = useState<string[]>([]);
   const [canPlace, setCanPlace] = useState<string[]>([]);
   const [affected, setAffected] = useState<Record<string, string[]>>({});
+  const [role, setRole] = useState<"black" | "white" | "">("");
   const [turn, setTurn] = useState<"black" | "white">("black");
   const [player1, setPlayer1] = useState<string>("");
   const [player2, setPlayer2] = useState<string>("");
@@ -104,6 +105,7 @@ export default function Home() {
     setIsAffected([]);
     setCanPlace([]);
     setAffected({});
+    setRole("");
     setTurn("black");
     setPlayer1("");
     setPlayer2("");
@@ -176,7 +178,7 @@ export default function Home() {
 
   useEffect(() => {
     const id = localStorage.getItem("id");
-
+    console.log(id);
     if (id) {
       socket?.send(JSON.stringify({ event: "login", id: id }));
     } else {
@@ -231,8 +233,10 @@ export default function Home() {
           // data = {
           //   event:,
           //   id:,
+          //   role:,
           // }
           setPlayer2(data.id);
+          setRole(data.role);
           break;
         case "sync":
           // data = {
@@ -264,7 +268,7 @@ export default function Home() {
           break;
       }
     };
-  }, [handleSetSection]);
+  }, []);
 
   return (
     <div className={styles.section} data-section={section}>
@@ -429,6 +433,7 @@ export default function Home() {
                         handleResetAffected();
                       }}
                       onClick={() => {
+                        if (turn !== role) return;
                         if (!canPlace.includes(`${rowIndex}${cellIndex}`))
                           return;
                         handlePlace(rowIndex, cellIndex);
@@ -463,20 +468,20 @@ export default function Home() {
         {/* load */}
         {contentType === "load" && (
           <div className={styles.load}>
-            {savedGames.map((game, index) => (
+            {savedGames.map((gameId, index) => (
               <div
                 key={index}
                 className={`${styles.button} ${
-                  selected === `save_${game}`
+                  selected === `save_${gameId}`
                     ? styles.selected
                     : selected
                     ? styles.unSelected
                     : ""
                 }`}
                 onClick={() => {
-                  setSelected(`save_${game}`);
+                  setSelected(`save_${gameId}`);
                   handleSetSection("game");
-                  handleJoinGame("local", game);
+                  handleJoinGame("local", gameId);
                 }}
               >
                 <h2>
