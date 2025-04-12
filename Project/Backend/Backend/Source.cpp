@@ -463,7 +463,7 @@ void leave(Data datas) {
 
 		json res = {
 			{"event","left"},
-			{"status",3},
+			{"gameId",game.id},
 			{"done",game.done}
 		};
 		p1->pWS->send(res.dump(), OpCode::TEXT, false);
@@ -480,7 +480,7 @@ void leave(Data datas) {
 		if (!game.done) {
 			json res = {
 				{"event","left"},
-				{"status",2},
+				{"gameId",game.id},
 				{"done",game.done}
 			};
 			datas.ws->send(res.dump(), OpCode::TEXT, false);
@@ -488,7 +488,7 @@ void leave(Data datas) {
 		else {
 			json res = {
 				{"event","left"},
-				{"status",1},
+				{"gameId",game.id},
 				{"done",game.done}
 			};
 			datas.ws->send(res.dump(), OpCode::TEXT, false);
