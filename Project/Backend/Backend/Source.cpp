@@ -529,36 +529,40 @@ map<string, void(*)(Data)> EVENTMAP{
 int main() {
 	ReversiDB::initDB();
 
-	App().ws<Player>("/*", {
-		/* WebSocket 事件處理 */
-		.open = [](webSocket* ws) {
-			cout << "WebSocket connected" << endl;
-		},
-		.message = [](webSocket* ws, string_view message, OpCode opCode) {
-			cout << message << opCode << endl;
-			json response = json::parse(message);
-			string socketEvent = response["event"];
-			if (EVENTMAP.find(socketEvent) != EVENTMAP.end()) {
-				try {
-					EVENTMAP[socketEvent](Data(ws, opCode, response));
+	App()
+		.get("/health", [](auto* res, auto* req) {
+		res->writeStatus("200 OK")->end("OK");
+			})
+		.ws<Player>("/*", {
+				/* WebSocket 事件處理 */
+				.open = [](webSocket* ws) {
+					cout << "WebSocket connected" << endl;
+				},
+				.message = [](webSocket* ws, string_view message, OpCode opCode) {
+					cout << message << opCode << endl;
+					json response = json::parse(message);
+					string socketEvent = response["event"];
+					if (EVENTMAP.find(socketEvent) != EVENTMAP.end()) {
+						try {
+							EVENTMAP[socketEvent](Data(ws, opCode, response));
+						}
+						catch (const Exception& e) {
+							cerr << e.what() << endl;
+						}
+					}
+					//ws->send(message, opCode, false);  // Echo 回傳訊息
+				},
+				.close = [](webSocket* ws, int c, string_view message) {
+					json response;
+					/*leave(Data(ws, opCode, response));
+					logout(Data(ws, opCode, response));*/
+					if (ws->getUserData()->gameId)leave(Data(ws, OpCode::TEXT, response));
+					if (ws->getUserData()->id)logout(Data(ws, OpCode::TEXT, response));
+					cout << "left" << endl;
 				}
-				catch (const Exception& e) {
-					cerr << e.what() << endl;
-				}
-			}
-			//ws->send(message, opCode, false);  // Echo 回傳訊息
-		},
-		.close = [](webSocket* ws, int c, string_view message) {
-			json response;
-			/*leave(Data(ws, opCode, response));
-			logout(Data(ws, opCode, response));*/
-			if (ws->getUserData()->gameId)leave(Data(ws, OpCode::TEXT, response));
-			if (ws->getUserData()->id)logout(Data(ws, OpCode::TEXT, response));
-			cout << "left" << endl;
-		}
-		}).listen(9001, [](auto* token) {
-			if (token) {
-				cout << "run on ws://localhost:9001" << endl;
-			}
-			}).run();
+			}).listen(9001, [](auto* token) {
+					if (token) {
+						cout << "run on ws://localhost:9001" << endl;
+					}
+				}).run();
 }
