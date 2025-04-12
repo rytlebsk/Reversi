@@ -12,8 +12,8 @@ using namespace nlohmann;
 using namespace chrono;
 using webSocket = uWS::WebSocket<0, 1, struct Player>;//alias
 struct Player {
-	int id = 0;
-	int gameId = 0;
+	int id = -1;
+	int gameId = -1;
 	chrono::system_clock::time_point lastPlaceTime;
 	webSocket* pWS = nullptr;
 };
@@ -180,6 +180,7 @@ void leave(Data datas); //need using so should be declare previously
 // handle function
 void place(Data datas) {
 	Player* p = datas.ws->getUserData();
+	if (p->gameId == -1)return;
 	Game& game = onlineGame[p->gameId];
 	string position = datas.data["position"];
 	int x = position[0] - '0';
@@ -207,6 +208,7 @@ void place(Data datas) {
 
 void undo(Data datas) {
 	Player* p = datas.ws->getUserData();
+	if (p->gameId == -1)return;
 	Game& game = onlineGame[p->gameId];
 	game.pathX.pop_back();
 	game.pathY.pop_back();
@@ -228,6 +230,7 @@ void undo(Data datas) {
 
 void update(Data datas) {
 	Player* p = datas.ws->getUserData();
+	if (p->gameId == -1)return;
 	Game& game = onlineGame[p->gameId];
 	try {
 		json p = {
@@ -248,19 +251,6 @@ void update(Data datas) {
 	}
 }
 
-void sync(Data datas) {
-	/*try {
-		json gameJson = game;
-		datas.ws->send(gameJson.dump(), datas.opCode);
-		cout << "Sync game state: " << gameJson.dump(4) << endl;
-	}
-	catch (const json::exception& e) {
-		cerr << "同步錯誤: " << e.what() << endl;
-	}*/
-
-
-}
-
 void regis(Data datas) {
 	int id = ReversiDB::regis();
 
@@ -275,6 +265,9 @@ void regis(Data datas) {
 }
 
 void login(Data datas) {
+	Player* p = datas.ws->getUserData();
+	if (p->id != -1)return;
+
 	try {
 		cout << "login" << endl;
 
@@ -316,6 +309,7 @@ void login(Data datas) {
 
 void logout(Data datas) {
 	Player* p = datas.ws->getUserData();
+	if (p->id == -1)return;
 	User* u = &onlineUser[UserId[p->id]];
 
 	ReversiDB::save(*u);
@@ -326,6 +320,9 @@ void logout(Data datas) {
 }
 
 void join(Data datas) {
+	Player* p = datas.ws->getUserData();
+	if (p->gameId != -1)return;
+
 	try {
 		string gameid = datas.data["id"];
 
@@ -441,12 +438,34 @@ void join(Data datas) {
 	}
 	catch (const json::exception& e) {
 		cerr << "加入遊戲錯誤: " << e.what() << endl;
+
+		json joined = {
+				{"event","joined"},
+				{"id","-1"},
+				{"role","-1"}
+		};
+
+		datas.ws->send(joined.dump(), datas.opCode, false);
+	}
+	catch (Exception& e) {
+		cerr << e.what() << endl;
+
+		json joined = {
+				{"event","joined"},
+				{"id","-1"},
+				{"role","-1"}
+		};
+
+		datas.ws->send(joined.dump(), datas.opCode, false);
 	}
 }
 
 void leave(Data datas) {
 	Player* p = datas.ws->getUserData();
 	User* u = &onlineUser[UserId[p->id]];
+
+	if (p->gameId == -1)return;
+
 	Game& game = onlineGame[p->gameId];
 
 	int gameId = onlineGame[p->gameId].id;
@@ -466,11 +485,11 @@ void leave(Data datas) {
 			{"gameId",game.id},
 			{"done",game.done}
 		};
-		p1->pWS->send(res.dump(), OpCode::TEXT, false);
-		p2->pWS->send(res.dump(), OpCode::TEXT, false);
+		if (p1->id != -1)p1->pWS->send(res.dump(), OpCode::TEXT, false);
+		if (p2->id != -1)p2->pWS->send(res.dump(), OpCode::TEXT, false);
 
 		onlineGame[p->gameId].id = -1;
-		p1->gameId = p2->gameId = 0;
+		p1->gameId = p2->gameId = -1;
 	}
 	else {
 		u->gameTable[gameId] = game;
@@ -495,12 +514,13 @@ void leave(Data datas) {
 		}
 
 		onlineGame[p->gameId].id = -1;
-		p->gameId = 0;
+		p->gameId = -1;
 	}
 }
 
 void timeout(Data datas) {
 	Player* p = datas.ws->getUserData();
+	if (p->gameId == -1)return;
 	Game& game = onlineGame[p->gameId];
 
 	game.done = (game.whiteScore > game.blackScore) ? 2 : (game.whiteScore == game.blackScore) ? 3 : 1;
@@ -515,7 +535,6 @@ void pong(Data datas) {
 map<string, void(*)(Data)> EVENTMAP{
 	{"place",place},
 	{"undo", undo},
-	{"sync",sync},
 	{"login",login},
 	{"logout",logout},
 	{"register",regis},
