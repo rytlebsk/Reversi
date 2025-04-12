@@ -2,7 +2,7 @@
 #include <nlohmann/json.hpp>
 using namespace nlohmann;
 
-Database db("reversi.db", OPEN_READWRITE | OPEN_CREATE);
+Database db("./db/reversi.db", OPEN_READWRITE | OPEN_CREATE);
 int dbUserSize, dbGameSize;
 
 vector<int> ReversiDB::existGame;

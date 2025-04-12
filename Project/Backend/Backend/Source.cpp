@@ -38,37 +38,6 @@ struct Data {
 	json data;
 };
 
-//ai place
-void ai_place(Game& game)
-{
-	if (game.blackId == game.whiteId)
-	{
-		if (game.player == 1 || !game.blackId)return;
-		size_t maxLength = 0;
-		int bestX, bestY;
-		for (const auto& entry : game.canEatSquare)
-		{
-			// entry.first 是鍵 (tuple<int, int>)
-			int x = std::get<0>(entry.first); // 獲取 x
-			int y = std::get<1>(entry.first); // 獲取 y
-			cout << x << y << endl;
-
-			// entry.second 是值 (vector<pair<int, int>>)
-			size_t length = entry.second.size(); // 獲取 vector 的長度
-
-			if (length > maxLength)
-			{
-				maxLength = length;
-				bestX = x;
-				bestY = y;
-			}
-		}
-		game.place(bestX, bestY);
-		game.pathX.push_back(bestX);
-		game.pathY.push_back(bestY);
-	}
-}
-
 // 定義 pair<int, int> 的 JSON 轉換
 void to_json(json& j, const pair<int, int>& p) {
 	j = { p.first,p.second };
@@ -118,6 +87,39 @@ json convertCanEatSquare(const unordered_map<tuple<int, int>, vector<pair<int, i
 	return result;
 }
 
+/*other function*/
+
+//ai place
+void ai_place(Game& game)
+{
+	if (game.blackId == game.whiteId)
+	{
+		if (game.player == 1 || !game.blackId || game.done)return;
+		size_t maxLength = 0;
+		int bestX, bestY;
+		for (const auto& entry : game.canEatSquare)
+		{
+			// entry.first 是鍵 (tuple<int, int>)
+			int x = std::get<0>(entry.first); // 獲取 x
+			int y = std::get<1>(entry.first); // 獲取 y
+			cout << x << y << endl;
+
+			// entry.second 是值 (vector<pair<int, int>>)
+			size_t length = entry.second.size(); // 獲取 vector 的長度
+
+			if (length > maxLength)
+			{
+				maxLength = length;
+				bestX = x;
+				bestY = y;
+			}
+		}
+		game.place(bestX, bestY);
+		game.pathX.push_back(bestX);
+		game.pathY.push_back(bestY);
+	}
+}
+//return timer
 void switchTimer(Game& game) {
 	if ((game.blackId == game.whiteId) || !game.blackId)return;
 
@@ -146,7 +148,35 @@ void switchTimer(Game& game) {
 	black->pWS->send(timer.dump(), OpCode::TEXT, false);
 	white->pWS->send(timer.dump(), OpCode::TEXT, false);
 }
+//replay
+void replay(webSocket* ws, Game& game) {
+	game.initialGame();
+	vector<vector<vector<int>>> historyGameBoard;
+	historyGameBoard.push_back(game.board);
+	int size = game.pathX.size();
+	for (int i = 0; i < size; i++) {
+		game.place(game.pathX[i], game.pathY[i]);
+		historyGameBoard.push_back(game.board);
+	}
+	try {
+		json response = {
+				{"event","replayed"},
+				{"board",historyGameBoard},
+		};
+		ws->send(response.dump(), OpCode::TEXT, false);
+	}
+	catch (const json::exception& e) {
+		json response = {
+			{"status","error"},
+		};
+		ws->send(response.dump(), OpCode::TEXT, false);
+		cerr << "JSON 轉換錯誤: " << e.what() << endl;
+	}
+}
 
+/*socket action function*/
+
+void leave(Data datas); //need using so should be declare previously
 // handle function
 void place(Data datas) {
 	Player* p = datas.ws->getUserData();
@@ -162,6 +192,8 @@ void place(Data datas) {
 
 	//AI放置
 	ai_place(game);
+
+	if (game.done)leave(datas);
 
 	try {
 		json gameJson = game;
@@ -190,33 +222,6 @@ void undo(Data datas) {
 		//datas.ws->send(gameJson.dump(), datas.opCode, false);
 	}
 	catch (const json::exception& e) {
-		cerr << "JSON 轉換錯誤: " << e.what() << endl;
-	}
-}
-
-void replay(Data datas) {
-	Player* p = datas.ws->getUserData();
-	Game& game = onlineGame[p->gameId];
-	game.initialGame();
-	vector<vector<vector<int>>> historyGameBoard;
-	historyGameBoard.push_back(game.board);
-	int size = game.pathX.size();
-	for (int i = 0; i < size; i++) {
-		game.place(game.pathX[i], game.pathY[i]);
-		historyGameBoard.push_back(game.board);
-	}
-	try {
-		json response = {
-				{"event","replayed"},
-				{"board",historyGameBoard},
-		};
-		datas.ws->send(response.dump(), datas.opCode, false);
-	}
-	catch (const json::exception& e) {
-		json response = {
-			{"status","error"},
-		};
-		datas.ws->send(response.dump(), datas.opCode, false);
 		cerr << "JSON 轉換錯誤: " << e.what() << endl;
 	}
 }
@@ -289,6 +294,7 @@ void login(Data datas) {
 		}
 
 		json gameId = {
+			{"event","logined"},
 			{"loginStatus","success"},
 			{"saveGame",user.gameId} ,
 			{"done",done}
@@ -415,6 +421,12 @@ void join(Data datas) {
 			Player* p = datas.ws->getUserData();
 			User* u = &onlineUser[UserId[p->id]];
 
+			Game& g = u->gameTable[stoi(gameid)];
+			if (g.done) {
+				replay(datas.ws, g);
+				return;
+			}
+
 			onlineGame.push_back(u->gameTable[stoi(gameid)]);
 			p->gameId = onlineGame.size() - 1;
 
@@ -448,7 +460,6 @@ void leave(Data datas) {
 		u1->gameTable[gameId] = u2->gameTable[gameId] = onlineGame[p->gameId];
 		ReversiDB::save(*u1);
 		ReversiDB::save(*u2);
-		onlineGame[p->gameId].id = -1;
 
 		json res = {
 			{"event","left"},
@@ -458,6 +469,7 @@ void leave(Data datas) {
 		p1->pWS->send(res.dump(), OpCode::TEXT, false);
 		p2->pWS->send(res.dump(), OpCode::TEXT, false);
 
+		onlineGame[p->gameId].id = -1;
 		p1->gameId = p2->gameId = 0;
 	}
 	else {
@@ -502,7 +514,6 @@ void pong(Data datas) {
 
 map<string, void(*)(Data)> EVENTMAP{
 	{"place",place},
-	{"replay",replay},
 	{"undo", undo},
 	{"sync",sync},
 	{"login",login},
