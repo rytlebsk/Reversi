@@ -7,31 +7,32 @@ import styles from "./page.module.css";
 const SOCKET_URL = "wss://cloud-backend-aznm.onrender.com/";
 
 export default function Home() {
+  const [id, setId] = useState<string>("");
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [selected, setSelected] = useState<string>("");
   const [section, setSection] = useState<string>("");
   const [contentType, setContentType] = useState<string>("");
 
   // Game
-  const [board, setBoard] = useState<string[][]>([
-    ["", "", "", "", "", "", "", ""],
-    ["", "", "", "", "", "", "", ""],
-    ["", "", "", "", "", "", "", ""],
-    ["", "", "", "", "", "", "", ""],
-    ["", "", "", "", "", "", "", ""],
-    ["", "", "", "", "", "", "", ""],
-    ["", "", "", "", "", "", "", ""],
-    ["", "", "", "", "", "", "", ""],
+  const [board, setBoard] = useState<number[][]>([
+    [0, 0, 0, 0, 0, 0, 0, 0], // 0 -> blank
+    [0, 0, 0, 0, 0, 0, 0, 0], // 1 -> black
+    [0, 0, 0, 0, 0, 0, 0, 0], // 2 -> white
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0],
   ]);
   const [isAffected, setIsAffected] = useState<string[]>([]);
   const [canPlace, setCanPlace] = useState<string[]>([]);
   const [affected, setAffected] = useState<Record<string, string[]>>({});
-  const [role, setRole] = useState<"black" | "white" | "">("");
-  const [turn, setTurn] = useState<"black" | "white">("black");
+  const [turn, setTurn] = useState<string>("");
   const [player1, setPlayer1] = useState<string>("");
   const [player2, setPlayer2] = useState<string>("");
-  const [timer1, setTimer1] = useState<number>(0);
-  const [timer2, setTimer2] = useState<number>(0);
+  const [timer1, setTimer1] = useState<number>(-1);
+  const [timer2, setTimer2] = useState<number>(-1);
+  const isMyTurn = `${turn}` === `${player1}`;
 
   // Load
   const STATUS_CODES = ["Unfinished", "Black Wins", "White Wins", "Tie"];
@@ -68,57 +69,61 @@ export default function Home() {
   const [queueHint, setQueueHint] = useState<string>("");
 
   // Handlers
-  const handlePlace = (row: number, cell: number) => {
-    socket?.send(JSON.stringify({ event: "place", position: `${row}${cell}` }));
+  const handlePlace = (cell: number, row: number) => {
+    if (!socket) return;
+    socket.send(JSON.stringify({ event: "place", position: `${cell}${row}` }));
+    socket.send(JSON.stringify({ event: "update" }));
   };
 
   const handleJoinGame = (
     type?: "local" | "online" | "bot",
     gameId?: string
   ) => {
+    if (!socket) return;
     if (gameId) {
-      socket?.send(JSON.stringify({ event: "join", gameId: gameId }));
+      socket.send(JSON.stringify({ event: "join", gameId: gameId }));
     } else if (type === "local") {
-      socket?.send(JSON.stringify({ event: "join", gameId: "new_game_l" }));
+      socket.send(JSON.stringify({ event: "join", gameId: "new_game_l" }));
     } else if (type === "online") {
-      socket?.send(JSON.stringify({ event: "join", gameId: "new_game_p" }));
+      socket.send(JSON.stringify({ event: "join", gameId: "new_game_p" }));
     } else if (type === "bot") {
-      socket?.send(JSON.stringify({ event: "join", gameId: "new_game_b" }));
+      socket.send(JSON.stringify({ event: "join", gameId: "new_game_b" }));
     }
   };
 
   const handleLeaveGame = () => {
-    socket?.send(JSON.stringify({ event: "leave" }));
+    if (!socket) return;
+    socket.send(JSON.stringify({ event: "leave" }));
+  };
+
+  const handleLeaveQueue = () => {
+    if (!socket) return;
+    socket.send(JSON.stringify({ event: "leaveMatch" }));
   };
 
   const handleClear = () => {
     setBoard([
-      ["", "", "", "", "", "", "", ""],
-      ["", "", "", "", "", "", "", ""],
-      ["", "", "", "", "", "", "", ""],
-      ["", "", "", "", "", "", "", ""],
-      ["", "", "", "", "", "", "", ""],
-      ["", "", "", "", "", "", "", ""],
-      ["", "", "", "", "", "", "", ""],
-      ["", "", "", "", "", "", "", ""],
+      [0, 0, 0, 0, 0, 0, 0, 0], // 0 -> blank
+      [0, 0, 0, 0, 0, 0, 0, 0], // 1 -> black
+      [0, 0, 0, 0, 0, 0, 0, 0], // 2 -> white
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
     ]);
     setIsAffected([]);
     setCanPlace([]);
     setAffected({});
-    setRole("");
-    setTurn("black");
+    setTurn("");
     setPlayer1("");
     setPlayer2("");
-    setTimer1(0);
-    setTimer2(0);
+    setTimer1(-1);
+    setTimer2(-1);
   };
 
-  // const handleNextTurn = () => {
-  //   setTurn(turn === "black" ? "white" : "black");
-  // };
-
-  const handleAffected = (row: number, cell: number) => {
-    setIsAffected(affected[`${row}${cell}`] || []);
+  const handleAffected = (cell: number, row: number) => {
+    setIsAffected(affected[`${cell}${row}`] || []);
   };
 
   const handleResetAffected = () => {
@@ -133,6 +138,26 @@ export default function Home() {
     },
     [contentType]
   );
+
+  const handleLogin = (id: string) => {
+    if (!socket) return;
+    socket.send(JSON.stringify({ event: "login", id: id }));
+  };
+
+  const handleRegister = () => {
+    if (!socket) return;
+    socket.send(JSON.stringify({ event: "register" }));
+  };
+
+  const handleUpdate = () => {
+    if (!socket) return;
+    socket.send(JSON.stringify({ event: "update" }));
+  };
+
+  const handleTimeout = () => {
+    if (!socket) return;
+    socket.send(JSON.stringify({ event: "timeout" }));
+  };
 
   const handleFormatTimer = (timer: number) => {
     let minutes = `${Math.floor(timer / 60)}`;
@@ -155,9 +180,11 @@ export default function Home() {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      if (turn === "black") setTimer1(Math.max(timer1 - 1, 0));
-      if (turn === "white") setTimer2(Math.max(timer2 - 1, 0));
-      if (section === "queue") setQueueTimer(Math.max(queueTimer + 1, 0));
+      if (isMyTurn && timer1 > 0) setTimer1(timer1 - 1);
+      if (!isMyTurn && timer2 > 0) setTimer2(timer2 - 1);
+      if (section === "queue") setQueueTimer(queueTimer + 1);
+      if (timer1 === 0) handleTimeout();
+      if (timer2 === 0) handleTimeout();
     }, 1000);
     return () => clearInterval(timer);
   }, [timer1, timer2, queueTimer, turn, section]);
@@ -169,22 +196,20 @@ export default function Home() {
       while (player2 === "") {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
-      console.log("opponent found");
       handleSetSection("game");
     };
-    if (section !== "queue") return;
     waitForOpponent();
   }, [section, player2, handleSetSection]);
 
   useEffect(() => {
-    const id = localStorage.getItem("id");
-    console.log(id);
-    if (id) {
-      socket?.send(JSON.stringify({ event: "login", id: id }));
+    const _id = id || localStorage.getItem("id");
+    if (_id) {
+      localStorage.setItem("id", _id);
+      handleLogin(_id);
     } else {
-      socket?.send(JSON.stringify({ event: "register" }));
+      handleRegister();
     }
-  }, [socket]);
+  }, [id, socket]);
 
   useEffect(() => {
     const socket = new WebSocket(SOCKET_URL);
@@ -209,21 +234,23 @@ export default function Home() {
       const data = JSON.parse(event.data);
       console.log(data);
       switch (data.event) {
-        case "login":
+        case "logined":
           // data = {
           //   event:,
           //   id:,
-          //   savedGames:,
+          //   saveGames:,
+          //   dones:,
           // }
           setPlayer1(data.id);
-          setSavedGames(data.savedGames);
-          setSavedGameStatus(data.done);
+          setSavedGames(data.saveGames);
+          setSavedGameStatus(data.dones);
           break;
         case "registered":
           // data = {
           //   event:,
           //   id:,
           // }
+          setId(data.id);
           setPlayer1(data.id);
           setSavedGames([]);
           setSavedGameStatus([]);
@@ -236,28 +263,34 @@ export default function Home() {
           //   role:,
           // }
           setPlayer2(data.id);
-          setRole(data.role);
+          handleUpdate();
+          break;
+        case "replay":
+          // data = {
+          //   event:,
+          //   board:,
+          // }
           break;
         case "sync":
           // data = {
           //   event:,
-          //   player1timer:,
-          //   player2timer:,
+          //   timer1:,
+          //   timer2:,
           // }
-          setTimer1(data.player1timer);
-          setTimer2(data.player2timer);
+          setTimer1(data.timer1);
+          setTimer2(data.timer2);
           break;
-        case "update":
+        case "updated":
           // data = {
           //   event:,
-          //   turn:,
+          //   player:,
           //   board:,
           //   canDo:,
           // }
           setBoard(data.board);
           setCanPlace(Object.keys(data.canDo));
           setAffected(data.canDo);
-          setTurn(data.turn);
+          setTurn(data.player);
           break;
         case "left":
           // data = {
@@ -269,6 +302,10 @@ export default function Home() {
       }
     };
   }, []);
+
+  // useEffect(() => {
+  //   console.log(board);
+  // }, [board]);
 
   return (
     <div className={styles.section} data-section={section}>
@@ -367,6 +404,7 @@ export default function Home() {
                 onClick={() => {
                   setSelected("back");
                   handleSetSection("");
+                  handleLeaveQueue();
                 }}
               >
                 <h2>Back</h2>
@@ -381,9 +419,7 @@ export default function Home() {
             <div className={styles.header}>
               <div className={`${styles.display} ${styles.left} `}>
                 <div
-                  className={`${styles.player} ${
-                    turn === "black" ? styles.turn : ""
-                  }`}
+                  className={`${styles.player} ${isMyTurn ? styles.turn : ""}`}
                 >
                   {player1}
                 </div>
@@ -392,9 +428,7 @@ export default function Home() {
               <div className={`${styles.display} ${styles.right} `}>
                 <div className={styles.timer}>{timer2}</div>
                 <div
-                  className={`${styles.player} ${
-                    turn === "white" ? styles.turn : ""
-                  }`}
+                  className={`${styles.player} ${!isMyTurn ? styles.turn : ""}`}
                 >
                   {player2}
                 </div>
@@ -409,15 +443,17 @@ export default function Home() {
                       key={cellIndex}
                       className={`
                         ${styles.cell}
-                        ${cell === "black" ? styles.black : ""} 
-                        ${cell === "white" ? styles.white : ""} 
+                        ${cell === 1 ? styles.x : ""} 
+                        ${cell === 2 ? styles.o : ""} 
                         ${
-                          isAffected.includes(`${rowIndex}${cellIndex}`)
+                          isMyTurn &&
+                          isAffected.includes(`${cellIndex}${rowIndex}`)
                             ? styles.affected
                             : ""
                         }
                         ${
-                          canPlace.includes(`${rowIndex}${cellIndex}`)
+                          isMyTurn &&
+                          canPlace.includes(`${cellIndex}${rowIndex}`)
                             ? styles.place
                             : ""
                         }
@@ -427,16 +463,16 @@ export default function Home() {
                             : styles.odd
                         }`}
                       onMouseEnter={() => {
-                        handleAffected(rowIndex, cellIndex);
+                        handleAffected(cellIndex, rowIndex);
                       }}
                       onMouseLeave={() => {
                         handleResetAffected();
                       }}
                       onClick={() => {
-                        if (turn !== role) return;
-                        if (!canPlace.includes(`${rowIndex}${cellIndex}`))
+                        if (!isMyTurn) return;
+                        if (!canPlace.includes(`${cellIndex}${rowIndex}`))
                           return;
-                        handlePlace(rowIndex, cellIndex);
+                        handlePlace(cellIndex, rowIndex);
                       }}
                     />
                   ))}
@@ -455,6 +491,7 @@ export default function Home() {
                 }`}
                 onClick={() => {
                   setSelected("back");
+                  setPlayer2("");
                   handleSetSection("");
                   handleLeaveGame();
                 }}
