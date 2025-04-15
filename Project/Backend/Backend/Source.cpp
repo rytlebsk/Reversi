@@ -250,16 +250,34 @@ void update(Data datas) {
 	if (p->gameId == -1)return;
 	Game& game = onlineGame[p->gameId];
 	int nowPlayer = game.player;
-	if (game.whiteId == 0 || game.whiteId == -1)nowPlayer = 1;
+
 	try {
-		json p = {
+		if (game.whiteId == 0 || game.whiteId == -1) {
+			json r = {
 			{"event","updated"},
 			{"status","ok"},
 			{"board",game.board},
 			{"canDo",convertCanEatSquare(game.canEatSquare)},
 			{"player",nowPlayer == 1 ? game.blackId : game.whiteId}
-		};
-		datas.ws->send(p.dump(), datas.opCode, false);
+			};
+			datas.ws->send(r.dump(), datas.opCode, false);
+		}
+		else {
+			Player* p1 = findMatch[MatchId[game.blackId]];
+			Player* p2 = findMatch[MatchId[game.whiteId]];
+
+			json r = {
+			{"event","updated"},
+			{"status","ok"},
+			{"board",game.board},
+			{"canDo",convertCanEatSquare(game.canEatSquare)},
+			{"player",nowPlayer == 1 ? game.blackId : game.whiteId}
+			};
+
+			p1->pWS->send(r.dump(), OpCode::TEXT, false);
+			p2->pWS->send(r.dump(), OpCode::TEXT, false);
+		}
+
 
 	}
 	catch (const json::exception& e) {
@@ -490,7 +508,7 @@ void join(Data datas) {
 				return;
 			}
 
-			onlineGame.push_back(u->gameTable[stoi(gameid)]);
+			onlineGame.push_back(g);
 			p->gameId = onlineGame.size() - 1;
 
 			json joined = {
