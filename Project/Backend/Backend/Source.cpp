@@ -22,6 +22,7 @@ struct Player {
 vector<User> onlineUser;
 vector<Game> onlineGame;
 vector<Player*> findMatch;
+vector<bool> inMatch;
 
 map<int, int> UserId;
 map<int, int> MatchId;
@@ -92,7 +93,7 @@ json convertCanEatSquare(const unordered_map<tuple<int, int>, vector<pair<int, i
 //ai place
 void ai_place(Game& game)
 {
-	if (game.blackId == game.whiteId)
+	if (game.whiteId == -1)
 	{
 		if (game.player == 1 || !game.blackId || game.done)return;
 		size_t maxLength = 0;
@@ -120,10 +121,21 @@ void ai_place(Game& game)
 	}
 }
 //return timer
-void switchTimer(Game& game) {
-	if ((game.blackId == game.whiteId) || !game.blackId)return;
+void switchTimer(Game& game, webSocket* ws) {
+	if (game.whiteId == 0 || game.whiteId == -1) {
+		json timer = {
+			{"event","sync"},
+			{"timer1",-1},
+			{"timer2",-1},
+		};
+
+		ws->send(timer.dump(), OpCode::TEXT, false);
+
+		return;
+	}
 
 	Player* white = findMatch[MatchId[game.whiteId]], * black = findMatch[MatchId[game.blackId]];
+
 	int nowPointer = game.player;
 	if (!nowPointer)return;
 
@@ -135,18 +147,20 @@ void switchTimer(Game& game) {
 		white->lastPlaceTime = system_clock::now();
 		game.blackTimer -= static_cast<double>((duration_cast<milliseconds>(system_clock::now() - black->lastPlaceTime)).count()) / 1000;
 	}
-	json timer = {
+	json timer1 = {
 		{"event","sync"},
-		{"timer",
-			{
-				{"black",game.blackTimer},
-				{"white",game.whiteTimer}
-			}
-		}
+		{"timer1",game.blackTimer},
+		{"timer2",game.whiteTimer},
 	};
 
-	black->pWS->send(timer.dump(), OpCode::TEXT, false);
-	white->pWS->send(timer.dump(), OpCode::TEXT, false);
+	json timer2 = {
+		{"event","sync"},
+		{"timer1",game.whiteTimer},
+		{"timer2",game.blackTimer},
+	};
+
+	black->pWS->send(timer1.dump(), OpCode::TEXT, false);
+	white->pWS->send(timer2.dump(), OpCode::TEXT, false);
 }
 //replay
 void replay(webSocket* ws, Game& game) {
@@ -176,7 +190,9 @@ void replay(webSocket* ws, Game& game) {
 
 /*socket action function*/
 
-void leave(Data datas); //need using so should be declare previously
+void leave(Data datas); //need using so should be declared previously
+void update(Data datas);
+
 // handle function
 void place(Data datas) {
 	Player* p = datas.ws->getUserData();
@@ -189,8 +205,9 @@ void place(Data datas) {
 	game.pathX.push_back(x);
 	game.pathY.push_back(y);
 
-	switchTimer(game);
+	switchTimer(game, p->pWS);
 
+	if (game.player == 2)update(datas);
 	//AI放置
 	ai_place(game);
 
@@ -232,12 +249,15 @@ void update(Data datas) {
 	Player* p = datas.ws->getUserData();
 	if (p->gameId == -1)return;
 	Game& game = onlineGame[p->gameId];
+	int nowPlayer = game.player;
+	if (game.whiteId == 0 || game.whiteId == -1)nowPlayer = 1;
 	try {
 		json p = {
+			{"event","updated"},
 			{"status","ok"},
 			{"board",game.board},
 			{"canDo",convertCanEatSquare(game.canEatSquare)},
-			{"player",game.player == 1 ? "black" : "white"}
+			{"player",nowPlayer == 1 ? game.blackId : game.whiteId}
 		};
 		datas.ws->send(p.dump(), datas.opCode, false);
 
@@ -289,8 +309,9 @@ void login(Data datas) {
 		json gameId = {
 			{"event","logined"},
 			{"loginStatus","success"},
-			{"saveGame",user.gameId} ,
-			{"done",done}
+			{"saveGames",user.gameId} ,
+			{"id",user.id},
+			{"dones",done}
 		};
 
 		datas.ws->send(gameId.dump(), datas.opCode, false);
@@ -324,14 +345,16 @@ void join(Data datas) {
 	if (p->gameId != -1)return;
 
 	try {
-		string gameid = datas.data["id"];
+		string gameid = datas.data["gameId"];
 
 		if (gameid == "new_game_b") {
 			Player* p = datas.ws->getUserData();
+			p->pWS = datas.ws;
 			User* u = &onlineUser[UserId[p->id]];
 
 			int gameId = ReversiDB::createGame(*u);
-			u->gameTable[gameId].whiteId = u->gameTable[gameId].blackId = p->id;
+			u->gameTable[gameId].blackId = p->id;
+			u->gameTable[gameId].whiteId = -1;
 			onlineGame.push_back(u->gameTable[gameId]);
 			p->gameId = onlineGame.size() - 1;
 
@@ -346,28 +369,45 @@ void join(Data datas) {
 			datas.ws->send(joined.dump(), datas.opCode, false);
 
 			onlineGame[p->gameId].initialGame();
+
+			switchTimer(onlineGame[p->gameId], p->pWS);
+
+			json r = {
+				{"event","updated"},
+				{"status","ok"},
+				{"board",onlineGame[p->gameId].board},
+				{"canDo",convertCanEatSquare(onlineGame[p->gameId].canEatSquare)},
+				{"player",onlineGame[p->gameId].blackId}
+			};
+
+			p->pWS->send(r.dump(), OpCode::TEXT, false);
 		}
 		else if (gameid == "new_game_p") {
 			Player* p = datas.ws->getUserData();
 			p->pWS = datas.ws;
+			inMatch.push_back(true);
 			findMatch.push_back(p);
+			MatchId[p->id] = findMatch.size() - 1;
 
-			if (!(findMatch.size() % 2)) {
+			if (findMatch.size() >= 2) {
 				Player* p1 = findMatch[findMatch.size() - 2];
 				Player* p2 = findMatch[findMatch.size() - 1];
 				User* u1 = &onlineUser[UserId[p1->id]];
 				User* u2 = &onlineUser[UserId[p2->id]];
 
+				if (!inMatch[findMatch.size() - 2]) {
+					datas.ws->send("Waiting for match...", OpCode::TEXT, false);
+					return;
+				}
+				inMatch[findMatch.size() - 2] = inMatch[findMatch.size() - 1] = false;
+
 				int gameId = ReversiDB::createGame(*u1);
 				u1->gameTable[gameId].blackId = u1->id;
 				u1->gameTable[gameId].whiteId = u2->id;
-				u1->gameTable[gameId].blackTimer = u1->gameTable[gameId].whiteTimer = 180;
+				u1->gameTable[gameId].blackTimer = u1->gameTable[gameId].whiteTimer = 300;
 
 				u2->gameId.push_back(gameId);
 				u2->gameTable.emplace(gameId, u1->gameTable[gameId]);
-
-				MatchId.emplace(p1->id, findMatch.size() - 2);
-				MatchId.emplace(p2->id, findMatch.size() - 1);
 
 				onlineGame.push_back(u1->gameTable[gameId]);
 
@@ -387,18 +427,30 @@ void join(Data datas) {
 
 				p2->gameId = p1->gameId = onlineGame.size() - 1;
 				p2->lastPlaceTime = chrono::system_clock::now();
-				switchTimer(onlineGame[p1->gameId]);
+				switchTimer(onlineGame[p1->gameId], p1->pWS);
 
 				onlineGame[p1->gameId].initialGame();
+
+				json r = {
+					{"event","updated"},
+					{"status","ok"},
+					{"board",onlineGame[p1->gameId].board},
+					{"canDo",convertCanEatSquare(onlineGame[p1->gameId].canEatSquare)},
+					{"player",onlineGame[p1->gameId].blackId}
+				};
+
+				p1->pWS->send(r.dump(), OpCode::TEXT, false);
+				p2->pWS->send(r.dump(), OpCode::TEXT, false);
 			}
-			else datas.ws->send("Waiting for match...", datas.opCode, false);
 		}
 		else if (gameid == "new_game_l") {
 			Player* p = datas.ws->getUserData();
+			p->pWS = datas.ws;
 			User* u = &onlineUser[UserId[p->id]];
 
 			int gameId = ReversiDB::createGame(*u);
-			u->gameTable[gameId].whiteId = u->gameTable[gameId].blackId = 0;
+			u->gameTable[gameId].blackId = p->id;
+			u->gameTable[gameId].whiteId = 0;
 			onlineGame.push_back(u->gameTable[gameId]);
 			p->gameId = onlineGame.size() - 1;
 
@@ -413,9 +465,23 @@ void join(Data datas) {
 			datas.ws->send(joined.dump(), datas.opCode, false);
 
 			onlineGame[p->gameId].initialGame();
+
+			switchTimer(onlineGame[p->gameId], p->pWS);
+
+			json r = {
+				{"event","updated"},
+				{"status","ok"},
+				{"board",onlineGame[p->gameId].board},
+				{"canDo",convertCanEatSquare(onlineGame[p->gameId].canEatSquare)},
+				{"player",onlineGame[p->gameId].blackId}
+			};
+
+			p->pWS->send(r.dump(), OpCode::TEXT, false);
+
 		}
 		else {
 			Player* p = datas.ws->getUserData();
+			p->pWS = datas.ws;
 			User* u = &onlineUser[UserId[p->id]];
 
 			Game& g = u->gameTable[stoi(gameid)];
@@ -434,6 +500,18 @@ void join(Data datas) {
 			};
 
 			datas.ws->send(joined.dump(), datas.opCode, false);
+
+			switchTimer(onlineGame[p->gameId], p->pWS);
+
+			json r = {
+				{"event","updated"},
+				{"status","ok"},
+				{"board",onlineGame[p->gameId].board},
+				{"canDo",convertCanEatSquare(onlineGame[p->gameId].canEatSquare)},
+				{"player",onlineGame[p->gameId].blackId}
+			};
+
+			p->pWS->send(r.dump(), OpCode::TEXT, false);
 		}
 	}
 	catch (const json::exception& e) {
@@ -470,7 +548,7 @@ void leave(Data datas) {
 
 	int gameId = onlineGame[p->gameId].id;
 
-	if (game.blackId != game.whiteId) {
+	if (game.whiteId != 0 && game.whiteId != -1) {
 		Player* p1 = findMatch[MatchId[game.blackId]];
 		Player* p2 = findMatch[MatchId[game.whiteId]];
 		User* u1 = &onlineUser[UserId[p1->id]];
@@ -523,13 +601,18 @@ void timeout(Data datas) {
 	if (p->gameId == -1)return;
 	Game& game = onlineGame[p->gameId];
 
-	game.done = (game.whiteScore > game.blackScore) ? 2 : (game.whiteScore == game.blackScore) ? 3 : 1;
+	game.done = p->id == game.blackId ? 2 : 1;
 	leave(datas);
 }
 
 void pong(Data datas) {
 	json pong = { {"pong","pong"} };
 	datas.ws->send(pong.dump(), OpCode::TEXT, false);
+}
+
+void leaveMatch(Data datas) {
+	Player* p = datas.ws->getUserData();
+	if (inMatch[MatchId[p->id]])inMatch[MatchId[p->id]] = false;
 }
 
 map<string, void(*)(Data)> EVENTMAP{
@@ -542,7 +625,8 @@ map<string, void(*)(Data)> EVENTMAP{
 	{"leave",leave},
 	{"update",update},
 	{"timeout",timeout},
-	{"ping",pong}
+	{"ping",pong},
+	{"leaveMatch",leaveMatch}
 };
 
 int main() {
@@ -575,8 +659,8 @@ int main() {
 					json response;
 					/*leave(Data(ws, opCode, response));
 					logout(Data(ws, opCode, response));*/
-					if (ws->getUserData()->gameId)leave(Data(ws, OpCode::TEXT, response));
-					if (ws->getUserData()->id)logout(Data(ws, OpCode::TEXT, response));
+					if (ws->getUserData()->gameId != -1)leave(Data(ws, OpCode::TEXT, response));
+					if (ws->getUserData()->id != -1)logout(Data(ws, OpCode::TEXT, response));
 					cout << "left" << endl;
 				}
 			}).listen(9001, [](auto* token) {
