@@ -81,7 +81,7 @@ export default function Home() {
   ) => {
     if (!socket) return;
     if (gameId) {
-      socket.send(JSON.stringify({ event: "join", gameId: gameId }));
+      socket.send(JSON.stringify({ event: "join", gameId: `${gameId}` }));
     } else if (type === "local") {
       socket.send(JSON.stringify({ event: "join", gameId: "new_game_l" }));
     } else if (type === "online") {
@@ -160,6 +160,7 @@ export default function Home() {
   };
 
   const handleFormatTimer = (timer: number) => {
+    if (timer < 0) return "00:00";
     let minutes = `${Math.floor(timer / 60)}`;
     if (minutes.length === 1) minutes = `0${minutes}`;
     let seconds = `${timer % 60}`;
@@ -423,10 +424,10 @@ export default function Home() {
                 >
                   {player1}
                 </div>
-                <div className={styles.timer}>{timer1}</div>
+                <div className={styles.timer}>{handleFormatTimer(timer1)}</div>
               </div>
               <div className={`${styles.display} ${styles.right} `}>
-                <div className={styles.timer}>{timer2}</div>
+                <div className={styles.timer}>{handleFormatTimer(timer2)}</div>
                 <div
                   className={`${styles.player} ${!isMyTurn ? styles.turn : ""}`}
                 >
@@ -522,7 +523,7 @@ export default function Home() {
                 }}
               >
                 <h2>
-                  Slot {index} {STATUS_CODES[savedGameStatus[index]]}
+                  Game {index + 1} {STATUS_CODES[savedGameStatus[index]]}
                 </h2>
               </div>
             ))}
