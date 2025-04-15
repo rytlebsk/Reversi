@@ -490,7 +490,7 @@ void join(Data datas) {
 				return;
 			}
 
-			onlineGame.push_back(u->gameTable[stoi(gameid)]);
+			onlineGame.push_back(g);
 			p->gameId = onlineGame.size() - 1;
 
 			json joined = {
