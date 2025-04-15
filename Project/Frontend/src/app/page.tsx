@@ -278,8 +278,8 @@ export default function Home() {
           //   timer1:,
           //   timer2:,
           // }
-          setTimer1(data.timer1);
-          setTimer2(data.timer2);
+          setTimer1(Math.round(data.timer1));
+          setTimer2(Math.round(data.timer2));
           break;
         case "updated":
           // data = {
