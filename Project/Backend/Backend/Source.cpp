@@ -252,33 +252,23 @@ void update(Data datas) {
 	int nowPlayer = game.player;
 
 	try {
-		if (game.whiteId == 0 || game.whiteId == -1) {
-			json r = {
+		json r = {
 			{"event","updated"},
 			{"status","ok"},
 			{"board",game.board},
 			{"canDo",convertCanEatSquare(game.canEatSquare)},
 			{"player",nowPlayer == 1 ? game.blackId : game.whiteId}
-			};
-			datas.ws->send(r.dump(), datas.opCode, false);
-		}
+		};
+
+		if (game.whiteId == 0 || game.whiteId == -1) datas.ws->send(r.dump(), datas.opCode, false);
+
 		else {
 			Player* p1 = findMatch[MatchId[game.blackId]];
 			Player* p2 = findMatch[MatchId[game.whiteId]];
 
-			json r = {
-			{"event","updated"},
-			{"status","ok"},
-			{"board",game.board},
-			{"canDo",convertCanEatSquare(game.canEatSquare)},
-			{"player",nowPlayer == 1 ? game.blackId : game.whiteId}
-			};
-
 			p1->pWS->send(r.dump(), OpCode::TEXT, false);
 			p2->pWS->send(r.dump(), OpCode::TEXT, false);
 		}
-
-
 	}
 	catch (const json::exception& e) {
 		json p = {
