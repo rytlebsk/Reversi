@@ -7,9 +7,7 @@ A simple and interactive Reversi (Othello) game that supports three game modes:
 
 The project provides a smooth and user-friendly interface suitable for casual and competitive players.
 
-=====================
-Requirements
-=====================
+## Requirements
 
 To run this project, you will need:
 - Windows operating system
@@ -19,9 +17,7 @@ To run this project, you will need:
 
 Make sure the C++ runtime is properly installed, or the application may not launch correctly.
 
-=====================
-Usage
-=====================
+## Usage
 
 1. Run the setup.bat file to install all required dependencies.
 2. Launch the Reversi.exe file to start the game.
@@ -32,9 +28,7 @@ Usage
 4. Follow the on-screen instructions and click on the board to place your piece.
 5. If you want to undo a move, select the "Undo" option. This will revert the board to the previous state, allowing you to reconsider and adjust your strategy.
 
-=====================
-Useful Resources
-=====================
+## Useful Resources
 
 - Reversi Rules: https://en.wikipedia.org/wiki/Reversi
 
