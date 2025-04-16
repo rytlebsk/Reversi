@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import styles from "./page.module.css";
 
-const SOCKET_URL = "wss://cloud-backend-aznm.onrender.com/";
+const SOCKET_URL = process.env.PUBLIC_SOCKET_URL || "";
 
 export default function Home() {
   const [id, setId] = useState<string>("");
