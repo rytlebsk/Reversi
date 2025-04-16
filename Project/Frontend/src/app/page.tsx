@@ -324,10 +324,6 @@ export default function Home() {
     };
   }, []);
 
-  // useEffect(() => {
-  //   console.log(board);
-  // }, [board]);
-
   return (
     <div className={styles.section} data-section={section}>
       <div className={styles.page}>
@@ -519,21 +515,36 @@ export default function Home() {
 
             <div className={styles.footer}>
               {step === -1 && (
-                <div
-                  className={`${styles.button} ${
-                    selected === "undo"
-                      ? styles.selected
-                      : selected
-                      ? styles.unSelected
-                      : ""
-                  }`}
-                  onClick={() => handleUndo()}
-                >
-                  <h2>Undo</h2>
+                <div>
+                  <div
+                    className={`${styles.button} ${
+                      selected === "undo"
+                        ? styles.selected
+                        : selected
+                        ? styles.unSelected
+                        : ""
+                    }`}
+                    onClick={() => handleUndo()}
+                  >
+                    <h2>Undo</h2>
+                  </div>
+                  <div
+                    className={`${styles.button} ${selected === "back"}`}
+                    onClick={() => {
+                      setSelected("back");
+                      handleSetSection("");
+                      handleLeaveGame();
+                      setTimeout(() => {
+                        handleClear();
+                      }, 1000);
+                    }}
+                  >
+                    <h2>Back</h2>
+                  </div>
                 </div>
               )}
               {step !== -1 && (
-                <div className={styles.replay}>
+                <div>
                   <div
                     className={`${styles.button} ${
                       selected === "prev"
@@ -560,27 +571,27 @@ export default function Home() {
                   >
                     <h2>Next</h2>
                   </div>
+                  <div
+                    className={`${styles.button} ${
+                      selected === "back"
+                        ? styles.selected
+                        : selected
+                        ? styles.unSelected
+                        : ""
+                    }`}
+                    onClick={() => {
+                      setSelected("back");
+                      handleSetSection("");
+                      handleLeaveGame();
+                      setTimeout(() => {
+                        handleClear();
+                      }, 1000);
+                    }}
+                  >
+                    <h2>Back</h2>
+                  </div>
                 </div>
               )}
-              <div
-                className={`${styles.button} ${
-                  selected === "back"
-                    ? styles.selected
-                    : selected
-                    ? styles.unSelected
-                    : ""
-                }`}
-                onClick={() => {
-                  setSelected("back");
-                  handleSetSection("");
-                  handleLeaveGame();
-                  setTimeout(() => {
-                    handleClear();
-                  }, 1000);
-                }}
-              >
-                <h2>Back</h2>
-              </div>
             </div>
           </div>
         )}

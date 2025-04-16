@@ -24,7 +24,7 @@ body {
   justify-content: center;
   align-items: center;
   color: var(--foreground);
-  font-size: 0.833vw;
+  font-size: 0.75vw;
   overflow: hidden;
 }
 
