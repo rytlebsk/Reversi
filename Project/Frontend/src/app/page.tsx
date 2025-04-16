@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import styles from "./page.module.css";
 
-const SOCKET_URL = process.env.PUBLIC_SOCKET_URL || "";
+const SOCKET_URL =
+  process.env.PUBLIC_SOCKET_URL || "wss://cloud-backend-aznm.onrender.com";
 
 export default function Home() {
   const [id, setId] = useState<string>("");
@@ -32,7 +33,10 @@ export default function Home() {
   const [player2, setPlayer2] = useState<string>("");
   const [timer1, setTimer1] = useState<number>(-1);
   const [timer2, setTimer2] = useState<number>(-1);
-  const isMyTurn = `${turn}` === `${player1}`;
+  const [replayBoard, setReplayBoard] = useState<number[][][]>([]);
+  const [step, setStep] = useState<number>(-1);
+  const [result, setResult] = useState<number>(-1);
+  const isMyTurn = `${turn}` === `${player1}` || `${turn}` === "0";
 
   // Load
   const STATUS_CODES = ["Unfinished", "Black Wins", "White Wins", "Tie"];
@@ -101,6 +105,11 @@ export default function Home() {
     socket.send(JSON.stringify({ event: "leaveMatch" }));
   };
 
+  const handleUndo = () => {
+    if (!socket) return;
+    socket.send(JSON.stringify({ event: "undo" }));
+  };
+
   const handleClear = () => {
     setBoard([
       [0, 0, 0, 0, 0, 0, 0, 0], // 0 -> blank
@@ -116,10 +125,12 @@ export default function Home() {
     setCanPlace([]);
     setAffected({});
     setTurn("");
-    setPlayer1("");
     setPlayer2("");
     setTimer1(-1);
     setTimer2(-1);
+    setStep(-1);
+    setResult(-1);
+    setReplayBoard([]);
   };
 
   const handleAffected = (cell: number, row: number) => {
@@ -213,6 +224,12 @@ export default function Home() {
   }, [id, socket]);
 
   useEffect(() => {
+    if (replayBoard.length === 0) return;
+    if (step === -1) return;
+    setBoard(replayBoard[step]);
+  }, [step, replayBoard]);
+
+  useEffect(() => {
     const socket = new WebSocket(SOCKET_URL);
 
     socket.onopen = () => {
@@ -266,11 +283,13 @@ export default function Home() {
           setPlayer2(data.id);
           handleUpdate();
           break;
-        case "replay":
+        case "replayed":
           // data = {
           //   event:,
           //   board:,
           // }
+          setStep(0);
+          setReplayBoard(data.board);
           break;
         case "sync":
           // data = {
@@ -296,9 +315,10 @@ export default function Home() {
         case "left":
           // data = {
           //   event:,
+          //   gameId:,
+          //   done:,
           // }
-          setPlayer2("");
-          handleSetSection("");
+          setResult(data.done);
           break;
       }
     };
@@ -417,24 +437,34 @@ export default function Home() {
         {/* game */}
         {contentType === "game" && (
           <div className={styles.game}>
-            <div className={styles.header}>
-              <div className={`${styles.display} ${styles.left} `}>
-                <div
-                  className={`${styles.player} ${isMyTurn ? styles.turn : ""}`}
-                >
-                  {player1}
+            {step === -1 && (
+              <div className={styles.header}>
+                <div className={`${styles.display} ${styles.left} `}>
+                  <div
+                    className={`${styles.player} ${
+                      isMyTurn ? styles.turn : ""
+                    }`}
+                  >
+                    {player1}
+                  </div>
+                  <div className={styles.timer}>
+                    {handleFormatTimer(timer1)}
+                  </div>
                 </div>
-                <div className={styles.timer}>{handleFormatTimer(timer1)}</div>
-              </div>
-              <div className={`${styles.display} ${styles.right} `}>
-                <div className={styles.timer}>{handleFormatTimer(timer2)}</div>
-                <div
-                  className={`${styles.player} ${!isMyTurn ? styles.turn : ""}`}
-                >
-                  {player2}
+                <div className={`${styles.display} ${styles.right} `}>
+                  <div className={styles.timer}>
+                    {handleFormatTimer(timer2)}
+                  </div>
+                  <div
+                    className={`${styles.player} ${
+                      !isMyTurn ? styles.turn : ""
+                    }`}
+                  >
+                    {player2}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             <div className={styles.board}>
               {board.map((row, rowIndex) => (
@@ -481,7 +511,57 @@ export default function Home() {
               ))}
             </div>
 
+            {result !== -1 && (
+              <div className={styles.resultText}>
+                <h2>{STATUS_CODES[result]}</h2>
+              </div>
+            )}
+
             <div className={styles.footer}>
+              {step === -1 && (
+                <div
+                  className={`${styles.button} ${
+                    selected === "undo"
+                      ? styles.selected
+                      : selected
+                      ? styles.unSelected
+                      : ""
+                  }`}
+                  onClick={() => handleUndo()}
+                >
+                  <h2>Undo</h2>
+                </div>
+              )}
+              {step !== -1 && (
+                <div className={styles.replay}>
+                  <div
+                    className={`${styles.button} ${
+                      selected === "prev"
+                        ? styles.selected
+                        : selected
+                        ? styles.unSelected
+                        : ""
+                    }`}
+                    onClick={() => setStep(Math.max(step - 1, 0))}
+                  >
+                    <h2>Prev</h2>
+                  </div>
+                  <div
+                    className={`${styles.button} ${
+                      selected === "next"
+                        ? styles.selected
+                        : selected
+                        ? styles.unSelected
+                        : ""
+                    }`}
+                    onClick={() =>
+                      setStep(Math.min(step + 1, replayBoard.length - 1))
+                    }
+                  >
+                    <h2>Next</h2>
+                  </div>
+                </div>
+              )}
               <div
                 className={`${styles.button} ${
                   selected === "back"
@@ -492,9 +572,11 @@ export default function Home() {
                 }`}
                 onClick={() => {
                   setSelected("back");
-                  setPlayer2("");
                   handleSetSection("");
                   handleLeaveGame();
+                  setTimeout(() => {
+                    handleClear();
+                  }, 1000);
                 }}
               >
                 <h2>Back</h2>
