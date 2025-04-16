@@ -78,7 +78,7 @@ const createWindow = async () => {
 
   if (app.isPackaged || !isDev) {
     appServe(mainWindow).then(() => {
-      mainWindow.loadURL("app://-");
+      mainWindow.loadURL("app://-/");
     });
   } else {
     mainWindow.loadURL(`${baseUri}`);
