@@ -93,32 +93,29 @@ json convertCanEatSquare(const unordered_map<tuple<int, int>, vector<pair<int, i
 //ai place
 void ai_place(Game& game)
 {
-	if (game.whiteId == -1)
+	size_t maxLength = 0;
+	int bestX, bestY;
+	for (const auto& entry : game.canEatSquare)
 	{
-		if (game.player == 1 || !game.blackId || game.done)return;
-		size_t maxLength = 0;
-		int bestX, bestY;
-		for (const auto& entry : game.canEatSquare)
+		// entry.first 是鍵 (tuple<int, int>)
+		int x = std::get<0>(entry.first); // 獲取 x
+		int y = std::get<1>(entry.first); // 獲取 y
+		cout << x << y << endl;
+
+		// entry.second 是值 (vector<pair<int, int>>)
+		size_t length = entry.second.size(); // 獲取 vector 的長度
+
+		if (length > maxLength)
 		{
-			// entry.first 是鍵 (tuple<int, int>)
-			int x = std::get<0>(entry.first); // 獲取 x
-			int y = std::get<1>(entry.first); // 獲取 y
-			cout << x << y << endl;
-
-			// entry.second 是值 (vector<pair<int, int>>)
-			size_t length = entry.second.size(); // 獲取 vector 的長度
-
-			if (length > maxLength)
-			{
-				maxLength = length;
-				bestX = x;
-				bestY = y;
-			}
+			maxLength = length;
+			bestX = x;
+			bestY = y;
 		}
-		game.place(bestX, bestY);
-		game.pathX.push_back(bestX);
-		game.pathY.push_back(bestY);
 	}
+	game.place(bestX, bestY);
+	game.pathX.push_back(bestX);
+	game.pathY.push_back(bestY);
+
 }
 //return timer
 void switchTimer(Game& game, webSocket* ws) {
@@ -193,7 +190,7 @@ void replay(webSocket* ws, Game& game) {
 void leave(Data datas); //need using so should be declared previously
 void update(Data datas);
 
-// handle function
+/*handle function*/
 void place(Data datas) {
 	Player* p = datas.ws->getUserData();
 	if (p->gameId == -1)return;
@@ -207,42 +204,34 @@ void place(Data datas) {
 
 	switchTimer(game, p->pWS);
 
-	if (game.player == 2)update(datas);
+	update(datas);
+
 	//AI放置
-	ai_place(game);
+	while (game.player == 2 && game.whiteId == -1 && !game.done) {
+		ai_place(game);
+		update(datas);
+	}
 
 	if (game.done)leave(datas);
-
-	try {
-		json gameJson = game;
-		//cout << "Game JSON: " << gameJson.dump(4) << endl;
-		//datas.ws->send(gameJson.dump(), datas.opCode, false);
-	}
-	catch (const json::exception& e) {
-		cerr << "JSON 轉換錯誤: " << e.what() << endl;
-	}
 }
 
 void undo(Data datas) {
 	Player* p = datas.ws->getUserData();
 	if (p->gameId == -1)return;
 	Game& game = onlineGame[p->gameId];
-	game.pathX.pop_back();
-	game.pathY.pop_back();
-	game.initialGame();
+	if (!(game.whiteId == -1 || game.whiteId == 0))return;
 
-	for (int i = 0; i < game.pathX.size(); i++) {
-		game.place(game.pathX[i], game.pathY[i]);
-	}
+	do {
+		game.pathX.pop_back();
+		game.pathY.pop_back();
 
-	try {
-		json gameJson = game;
-		cout << "Game JSON: " << gameJson.dump(4) << endl;
-		//datas.ws->send(gameJson.dump(), datas.opCode, false);
-	}
-	catch (const json::exception& e) {
-		cerr << "JSON 轉換錯誤: " << e.what() << endl;
-	}
+		game.initialGame();
+
+		for (int i = 0; i < game.pathX.size(); i++) {
+			game.place(game.pathX[i], game.pathY[i]);
+		}
+	} while (((game.whiteId == 0) || (game.whiteId == -1 && game.player != 1)) && (game.pathX.size() != 0));
+	update(datas);
 }
 
 void update(Data datas) {
@@ -503,7 +492,7 @@ void join(Data datas) {
 
 			json joined = {
 				{"event","joined"},
-				{"id","bot"},
+				{"id",onlineGame[p->gameId].whiteId == -1 ? "bot" : to_string(p->id)},
 				{"role","black"}
 			};
 
@@ -661,12 +650,9 @@ int main() {
 							cerr << e.what() << endl;
 						}
 					}
-					//ws->send(message, opCode, false);  // Echo 回傳訊息
 				},
 				.close = [](webSocket* ws, int c, string_view message) {
 					json response;
-					/*leave(Data(ws, opCode, response));
-					logout(Data(ws, opCode, response));*/
 					if (ws->getUserData()->gameId != -1)leave(Data(ws, OpCode::TEXT, response));
 					if (ws->getUserData()->id != -1)logout(Data(ws, OpCode::TEXT, response));
 					cout << "left" << endl;

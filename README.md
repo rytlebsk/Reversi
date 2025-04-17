@@ -1,34 +1,77 @@
-# Reversi
+# Reversi 黑白棋遊戲 (Reversi Game)
 
-A simple and interactive Reversi (Othello) game that supports three game modes:
-- Local Two-Player
-- Single-Player (vs AI)
-- Online Multiplayer
+本專案是一款支援三種模式的黑白棋（Reversi/Othello）遊戲：
+- 🎮 本地雙人對戰（Local Multiplayer）
+- 🤖 玩家對 AI（AI Battle）
+- 🌐 線上對戰（Online Multiplayer）
 
-The project provides a smooth and user-friendly interface suitable for casual and competitive players.
+## 📦 依賴項目 (Dependencies)
 
-## Requirements
+為了順利運行本專案，你需要安裝以下工具：
+1. [Docker Desktop](https://www.docker.com/products/docker-desktop)
+2. 一個前端包管理器，如 [npm](https://www.npmjs.com/) 或 [yarn](https://yarnpkg.com/)
 
-To run this project, you will need:
-- Windows operating system
-- Ability to run .bat and .exe files
-- C++ runtime environment (e.g. Microsoft Visual C++ Redistributable)
-- Internet connection (required for online multiplayer mode)
+## 🚀 專案部署方式 (How to Run)
 
-Make sure the C++ runtime is properly installed, or the application may not launch correctly.
+### 前端部署 (Frontend Setup)
 
-## Usage
+以 **npm** 為例：
 
-1. Run the setup.bat file to install all required dependencies.
-2. Launch the Reversi.exe file to start the game.
-3. On the main screen, choose your desired game mode:
-   - Local Two-Player
-   - Single-Player
-   - Online Multiplayer
-4. Follow the on-screen instructions and click on the board to place your piece.
-5. If you want to undo a move, select the "Undo" option. This will revert the board to the previous state, allowing you to reconsider and adjust your strategy.
+```bash
+npm install     # 安裝專案依賴
+npm run dev     # 啟動開發伺服器（預設為 http://localhost:3000）
+```
 
-## Useful Resources
+### 後端部署 (Backend Setup)
 
-- Reversi Rules: https://en.wikipedia.org/wiki/Reversi
+請運行以下檔案：
 
+```bash
+run.bat         # 啟動伺服器，依照提示完成部署
+```
+
+若要結束伺服器：
+
+```bash
+stop.bat        # 停止伺服器運行
+```
+
+---
+
+## 🌐 English Version
+
+This is a **Reversi (Othello)** game supporting three game modes:
+- 🎮 Local Multiplayer
+- 🤖 Player vs AI
+- 🌐 Online Multiplayer
+
+### 📦 Requirements
+
+Before running the project, make sure you have the following:
+1. [Docker Desktop](https://www.docker.com/products/docker-desktop)
+2. A package manager like [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
+
+### 🚀 How to Run the Project
+
+#### Frontend
+
+Using **npm** as an example:
+
+```bash
+npm install     # Install all dependencies
+npm run dev     # Start development server (usually http://localhost:5173)
+```
+
+#### Backend
+
+To start the backend server:
+
+```bash
+run.bat         # Follow the instructions to complete setup
+```
+
+To stop the server:
+
+```bash
+stop.bat        # Shutdown the server
+```
